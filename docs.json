@@ -7,7 +7,7 @@
     "light": "#34c8fa",
     "dark": "#0184db"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/images/photo_2026-01-20_01-32-02.jpg",
   "navigation": {
     "tabs": [
       {
@@ -83,10 +83,7 @@
       ]
     }
   },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
+  "logo": "/images/photo_2026-01-20_01-32-02.jpg",
   "navbar": {
     "links": [
       {
