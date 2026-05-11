@@ -26,9 +26,9 @@
     "tabs": [
       {
         "tab": "Guides",
-        "products": [
+        "groups": [
           {
-            "product": "Getting started",
+            "group": "Getting started",
             "pages": [
               "index",
               "quickstart",
@@ -36,7 +36,7 @@
             ]
           },
           {
-            "product": "Product",
+            "group": "Product",
             "pages": [
               "features",
               "commerce",
