@@ -41,11 +41,10 @@ Each user sees one logical USDC balance. Under the hood, Circle manages chain-sp
 Supported chains in the current product plan:
 
 - Ethereum
-- Polygon
+- Monad
 - Base
-- Arbitrum
+- Arc
 - Solana
-- Avalanche
 
 ## Operational controls
 
@@ -56,14 +55,3 @@ Supported chains in the current product plan:
 | Webhook signing | Merchant webhook events are signed before delivery. |
 | Slippage control | Auto-convert enforces a 0.5% maximum slippage target. |
 | Multi-sig approvals | Enterprise accounts can require 2-of-3 approvals before outgoing transfers or payroll execution. |
-
-## Local docs preview
-
-Use the Mintlify CLI to preview documentation changes from this repository.
-
-```bash
-npm i -g mint
-mint dev
-```
-
-The local preview is usually available at `http://localhost:3000`.

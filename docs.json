@@ -29,17 +29,30 @@
         "groups": [
           {
             "group": "Getting started",
-            "pages": ["index", "quickstart", "development"]
+            "pages": [
+              "index",
+              "quickstart",
+              "development"
+            ]
           },
           {
             "group": "Product",
             "root": "product",
-            "pages": ["features", "commerce", "ai-agents", "data-model", "roadmap"]
+            "pages": [
+              "features",
+              "commerce",
+              "ai-agents",
+              "data-model",
+              "roadmap"
+            ]
           }
         ]
       },
       {
-        "tab": "API reference"
+        "tab": "API reference",
+        "pages": [
+          "api"
+        ]
       }
     ]
   },
