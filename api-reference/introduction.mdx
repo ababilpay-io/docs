@@ -1,0 +1,52 @@
+---
+title: "API Reference"
+description: "Overview of the AbabilPay REST API and webhook model."
+---
+
+The AbabilPay API lets merchants and developers create payment intents, issue invoices, transfer USDC, bridge USDC across chains, execute payroll batches, issue refunds, inspect transactions, and register webhook endpoints.
+
+## Base URLs
+
+| Environment | URL |
+| --- | --- |
+| Production | `https://api.ababilpay.io` |
+| Sandbox | `https://sandbox.api.ababilpay.io` |
+
+## Authentication
+
+Use a bearer API key on every request.
+
+```bash
+Authorization: Bearer $ABABILPAY_API_KEY
+```
+
+Merchant API keys should be stored server-side only. Browser and mobile clients should use hosted payment links or short-lived tokens issued by your backend.
+
+## Core endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/v1/payments/intent` | Create a hosted payment link. |
+| `GET` | `/v1/payments/{id}` | Get payment status and details. |
+| `POST` | `/v1/invoices` | Create an invoice with line items. |
+| `POST` | `/v1/invoices/{id}/send` | Send an invoice by email. |
+| `POST` | `/v1/transfers` | Send USDC to a wallet address or email. |
+| `POST` | `/v1/bridge` | Initiate a CCTP bridge transfer. |
+| `POST` | `/v1/payroll/batch` | Submit a bulk payment batch. |
+| `GET` | `/v1/wallet/balance` | Get unified USDC balance across chains. |
+| `POST` | `/v1/refunds` | Issue a refund. |
+| `GET` | `/v1/transactions` | List transactions with filters. |
+| `POST` | `/v1/webhooks` | Register a webhook endpoint. |
+
+## Webhook events
+
+| Event | Trigger |
+| --- | --- |
+| `payment.completed` | Payment confirmed and USDC credited. |
+| `payment.failed` | Payment attempt failed. |
+| `invoice.paid` | Invoice fully settled. |
+| `invoice.overdue` | Invoice is past due with an unpaid balance. |
+| `refund.issued` | Refund processed and USDC returned. |
+| `bridge.completed` | CCTP bridge settled on destination chain. |
+| `payroll.batch_completed` | Payroll batch recipients paid. |
+| `fraud.flagged` | AI agent flagged a suspicious transaction. |
