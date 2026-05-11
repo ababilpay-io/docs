@@ -33,6 +33,7 @@
           },
           {
             "group": "Product",
+            "root": "product",
             "pages": ["features", "commerce", "ai-agents", "data-model", "roadmap"]
           }
         ]
@@ -42,6 +43,32 @@
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/feature",
+      "destination": "/features"
+    },
+    {
+      "source": "/product/feature",
+      "destination": "/features"
+    },
+    {
+      "source": "/product/features",
+      "destination": "/features"
+    },
+    {
+      "source": "/product/commerce",
+      "destination": "/commerce"
+    },
+    {
+      "source": "/commarch",
+      "destination": "/commerce"
+    },
+    {
+      "source": "/commerch",
+      "destination": "/commerce"
+    }
+  ],
   "logo": "/images/photo_2026-01-20_01-32-02.jpg",
   "navbar": {
     "links": [
