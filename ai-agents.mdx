@@ -1,0 +1,53 @@
+---
+title: "AI Agent System"
+description: "Autonomous agents for payment operations, fraud review, reminders, forecasting, and bridge routing."
+---
+
+AbabilPay includes an AI agent layer built around Claude, LangChain-style orchestration, Supabase data, Circle actions, and pgvector memory. Agents react to product events, write audit logs, and communicate through email or push notifications.
+
+## Architecture
+
+The Orchestrator Agent receives events from Supabase Edge Functions and routes work to specialized agents. Each agent can use scoped tools for Supabase reads and writes, Circle API actions, Resend email, and push notifications.
+
+```mermaid
+flowchart LR
+  Event[Supabase DB event] --> Edge[Edge Function trigger]
+  Edge --> Orchestrator[Orchestrator Agent]
+  Orchestrator --> Agent[Specialized sub-agent]
+  Agent --> Action[Circle API, email, or push]
+  Action --> Logs[agent_logs written]
+```
+
+## Agent roster
+
+| Agent | Responsibility | Example actions |
+| --- | --- | --- |
+| Orchestrator | Event routing and task coordination | Receives webhook events, chooses sub-agent, handles retries, logs decisions. |
+| Auto-Convert Agent | Swap executor for non-USDC deposits | Fetches quotes, enforces slippage, executes swap, notifies user. |
+| Invoice Follow-Up Agent | Invoice reminder and collection workflow | Sends due-date reminders, marks overdue invoices, drafts personalized follow-ups. |
+| Fraud Detection Agent | Real-time anomaly and risk detection | Flags unusual amounts, detects new destination wallets, can hold suspicious transfers. |
+| Insights and Forecast Agent | Merchant analytics and cash-flow forecasting | Weekly revenue emails, 30-day forecasts, customer trend detection. |
+| Bridge Route Agent | Cross-chain route selection | Fetches gas data, estimates route cost, selects cheapest route that satisfies timing. |
+
+## Agent memory
+
+Agents store reusable context as vector embeddings in the `agent_memory` table. This enables semantic search over transaction patterns, merchant history, and prior decisions without sending long histories to the model every time.
+
+```sql
+insert into agent_memory (user_id, content, embedding)
+values (
+  'user-uuid',
+  'User typically sends $200-500 USDC to 3 recurring wallets on Fridays',
+  openai_embedding('user payment pattern...')
+);
+
+select content
+from agent_memory
+where user_id = 'user-uuid'
+order by embedding <-> query_embedding
+limit 5;
+```
+
+## Auditability
+
+Every agent action should be written to `agent_logs` with the agent type, action, input context, result, optional risk score, and timestamp. This keeps automated payment operations inspectable for support, compliance review, and product debugging.

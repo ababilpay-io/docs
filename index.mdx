@@ -1,97 +1,86 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "AbabilPay Overview"
+description: "USDC-native, multichain payment infrastructure for wallets, merchants, commerce, and AI-powered operations."
 ---
 
-## Setting up
+# AbabilPay
 
-Get your documentation site up and running in minutes.
+AbabilPay is a USDC-native payment infrastructure platform for consumers, merchants, developers, and enterprise teams. It abstracts chain complexity, keeps balances denominated in USDC, and automates payment operations through an AI agent layer.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+<Note>
+  Product docs version: v1.0 draft, May 2026. Core infrastructure: Circle APIs, Supabase, and AI agents.
+</Note>
 
-## Make it yours
+## Positioning
 
-Design a docs site that looks great and empowers your users.
+AbabilPay is built to be Stripe for the crypto economy: multichain-ready, USDC-first, low-volatility for merchants, and practical for real businesses that need checkout, invoices, payouts, and reporting.
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+Everything inside the product is denominated in USDC. Customers can deposit or pay with supported tokens, while AbabilPay handles conversion, bridge routing, wallet provisioning, and transaction records behind the scenes.
+
+## Who it serves
+
+| User type | Who they are | Primary goals | Key surfaces |
+| --- | --- | --- | --- |
+| Consumer | Individual users | Pay merchants, send or receive USDC, manage wallet activity | Wallet, bridge, split payments, on-ramp |
+| Merchant | Stores, freelancers, SaaS teams | Accept payments, issue invoices, track revenue | Dashboard, invoices, plugins, off-ramp |
+| Developer | App, Shopify, and WooCommerce builders | Integrate crypto payments into products | REST API, SDKs, webhooks, sandbox |
+| Enterprise | Larger businesses and DAO treasuries | Bulk payments, payroll, approvals | Payroll, multi-sig, white-label API |
+| AI agent system | Autonomous platform actor | Automate operational work | Agent orchestrator, Supabase, Circle tools |
+
+## Core capabilities
+
+<CardGroup cols={2}>
+  <Card title="Unified USDC Wallet" icon="wallet" href="/features">
+    One logical wallet balance across Ethereum, Polygon, Base, Arbitrum, Solana, and Avalanche.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Auto-Convert" icon="rotate" href="/features#auto-convert">
+    Non-USDC deposits can be swapped to USDC automatically through 1inch or 0x.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="CCTP Bridge" icon="bridge" href="/features#cross-chain-bridge">
+    Native USDC cross-chain transfers powered by Circle Cross-Chain Transfer Protocol.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Invoices" icon="file-invoice-dollar" href="/commerce#invoice-system">
+    Merchant invoicing with payment links, PDFs, email delivery, reminders, and status tracking.
   </Card>
-</Columns>
+  <Card title="Commerce Plugins" icon="store" href="/commerce">
+    Shopify and WooCommerce checkout integrations for crypto payments settled in USDC.
+  </Card>
+  <Card title="AI Operations" icon="sparkles" href="/ai-agents">
+    Agents for auto-convert, invoice follow-up, fraud detection, insights, and bridge routing.
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## Platform stack
 
-Everything you need to create world-class documentation.
+| Layer | Technology | Role |
+| --- | --- | --- |
+| Web frontend | Next.js 14, TypeScript | Merchant dashboard, consumer wallet, developer portal |
+| Mobile | React Native with Expo | iOS and Android wallet experience |
+| Backend API | Fastify and Node.js | REST API, orchestration, integrations |
+| Data and auth | Supabase | PostgreSQL, Auth, Realtime, Storage, Edge Functions, RLS |
+| Wallets and USDC | Circle APIs | Developer-controlled wallets, USDC, CCTP, ramps |
+| Swaps | 1inch and 0x | Token-to-USDC conversion quotes and execution |
+| AI | Claude API, LangChain, pgvector | Agent reasoning, orchestration, and long-term memory |
+| Notifications | Resend, Firebase FCM | Transactional email and mobile push |
+| Commerce | Shopify App, WordPress plugin | E-commerce checkout integrations |
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Why Supabase
 
-## Need inspiration?
+Supabase is the primary application backend because it combines PostgreSQL for structured transaction data, Auth for Google OAuth, Realtime for live wallet and invoice updates, Storage for invoice PDFs and KYC documents, Edge Functions for event handling, and pgvector for AI agent memory. Row Level Security policies enforce user-scoped access across product data.
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Read next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Integrate a hosted payment link, API key, and webhook endpoint.
+  </Card>
+  <Card title="Core Features" icon="blocks" href="/features">
+    Wallet, auto-convert, bridge, ramp, and split payment behavior.
+  </Card>
+  <Card title="API Reference" icon="terminal" href="/api-reference/introduction">
+    Review the REST API endpoints and webhook event payloads.
+  </Card>
+  <Card title="Roadmap" icon="map" href="/roadmap">
+    Product phases from MVP through advanced commerce features.
+  </Card>
+</CardGroup>

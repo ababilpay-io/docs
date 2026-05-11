@@ -1,80 +1,104 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Accept a crypto payment that settles to USDC."
 ---
 
-## Get started in three steps
+This guide shows the minimum integration path for a merchant or developer: create a payment intent, send the customer to a payment link, and receive a signed webhook when payment completes.
 
-Get your documentation site running locally and make your first customization.
+<Info>
+  The production implementation is expected to use API keys, HMAC-signed webhooks, Circle testnet or mainnet configuration, and Supabase-backed merchant records.
+</Info>
 
-### Step 1: Set up your local environment
+## Integration flow
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Create a merchant account">
+    Sign in with Google OAuth. AbabilPay creates the Supabase user record, provisions a Circle developer-controlled wallet, and stores the merchant profile.
+  </Step>
+  <Step title="Create a payment intent">
+    Call `POST /v1/payments/intent` with the USDC amount, customer reference, and optional metadata.
 
-### Step 2: Deploy your changes
+    ```bash
+    curl -X POST https://api.ababilpay.io/v1/payments/intent \
+      -H "Authorization: Bearer $ABABILPAY_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "amount_usdc": 250,
+        "customer_email": "buyer@example.com",
+        "description": "Order #10042",
+        "success_url": "https://merchant.example/success",
+        "cancel_url": "https://merchant.example/cancel"
+      }'
+    ```
+  </Step>
+  <Step title="Redirect the customer">
+    Send the customer to the returned `payment_url`. The customer can pay with supported tokens, while AbabilPay handles auto-conversion to USDC.
+  </Step>
+  <Step title="Listen for the webhook">
+    Register a webhook endpoint with `POST /v1/webhooks` and subscribe to events such as `payment.completed`, `payment.failed`, and `refund.issued`.
+  </Step>
+</Steps>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Example payment intent response
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```json
+{
+  "id": "pay_01HX7M2S9R5",
+  "status": "requires_payment",
+  "amount_usdc": 250,
+  "payment_url": "https://pay.ababilpay.io/pay/pay_01HX7M2S9R5",
+  "expires_at": "2026-05-10T15:02:00Z"
+}
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## Webhook payload
 
-### Step 3: Go live
+```json
+{
+  "event": "payment.completed",
+  "id": "evt_01HX9K8VQ2",
+  "created_at": "2026-05-10T14:32:00Z",
+  "data": {
+    "payment_id": "pay_01HX7M2S9R5",
+    "amount_usdc": 250,
+    "chain": "polygon",
+    "merchant_id": "mer_01HX7J9Y",
+    "token_in": "MATIC",
+    "tx_hash": "0xabc..."
+  }
+}
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Webhook verification
 
-## Next steps
+Each webhook request should include a timestamp and HMAC signature header. Recompute the signature over the raw body and reject requests with invalid signatures or stale timestamps.
 
-Now that you have your docs running, explore these key features:
+```ts
+import crypto from "node:crypto";
+
+export function verifyWebhook(rawBody: string, signature: string, secret: string) {
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
+```
+
+## Common next steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Invoices" icon="file-invoice-dollar" href="/commerce#invoice-system">
+    Create invoices, send branded payment links, and track payment state.
+  </Card>
+  <Card title="Shopify and WooCommerce" icon="store" href="/commerce#e-commerce-payment-suite">
+    Use hosted commerce plugins instead of a direct API integration.
+  </Card>
+  <Card title="Transfers" icon="send" href="/api-reference/introduction">
+    Send USDC to a wallet address or email recipient.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/api-reference/introduction">
+    Register an endpoint for payment and operational events.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

@@ -1,94 +1,69 @@
 ---
-title: 'Development'
-description: 'Preview changes locally to update your docs'
+title: "Architecture"
+description: "Implementation model for the AbabilPay product."
 ---
 
-<Info>
-  **Prerequisites**:
-  - Node.js version 19 or higher
-  - A docs repository with a `docs.json` file
-</Info>
+AbabilPay is organized around a Supabase-backed application core, Circle-powered wallet and USDC operations, and an AI agent layer that reacts to product events.
 
-Follow these steps to install and run Mintlify on your operating system.
+## Authentication and onboarding
 
-<Steps>
-<Step title="Install the Mintlify CLI">
+Users sign in with Google OAuth through Supabase Auth. On first login, the platform creates the Supabase user record, provisions a Circle developer-controlled wallet, and asks the user to select a role.
+
+| Step | Action | Stored in |
+| --- | --- | --- |
+| 1 | Google sign-in | `users.google_id` |
+| 2 | Circle wallet creation | `wallets.circle_wallet_id` |
+| 3 | Consumer or merchant role setup | `users.role`, `merchants.*` |
+| 4 | Optional KYC for ramps | Supabase Storage, `users.kyc_status` |
+| 5 | Dashboard routing | Supabase Auth session |
+
+## Event-driven operations
+
+Product events are written to Supabase and picked up by Edge Functions or backend workers. The frontend subscribes to user-scoped Supabase Realtime channels so wallet balances, invoice states, split payment status, and notifications update without polling.
+
+```mermaid
+flowchart LR
+  App[Web or mobile app] --> API[Fastify REST API]
+  API --> DB[(Supabase Postgres)]
+  API --> Circle[Circle APIs]
+  DB --> Realtime[Supabase Realtime]
+  Realtime --> App
+  DB --> Edge[Edge Function]
+  Edge --> Agents[AI Agent Orchestrator]
+  Agents --> Circle
+  Agents --> Email[Resend and FCM]
+```
+
+## Wallet model
+
+Each user sees one logical USDC balance. Under the hood, Circle manages chain-specific wallets and AbabilPay aggregates the balances into a single wallet view.
+
+Supported chains in the current product plan:
+
+- Ethereum
+- Polygon
+- Base
+- Arbitrum
+- Solana
+- Avalanche
+
+## Operational controls
+
+| Control | Behavior |
+| --- | --- |
+| Row Level Security | User data is scoped by Supabase Auth UID. |
+| Audit logs | AI and payment actions are written to `agent_logs` and transaction tables. |
+| Webhook signing | Merchant webhook events are signed before delivery. |
+| Slippage control | Auto-convert enforces a 0.5% maximum slippage target. |
+| Multi-sig approvals | Enterprise accounts can require 2-of-3 approvals before outgoing transfers or payroll execution. |
+
+## Local docs preview
+
+Use the Mintlify CLI to preview documentation changes from this repository.
 
 ```bash
 npm i -g mint
-```
-</Step>
-
-<Step title="Preview locally">
-
-Navigate to your docs directory where your `docs.json` file is located, and run the following command:
-
-```bash
 mint dev
 ```
 
-A local preview of your documentation will be available at `http://localhost:3000`.
-
-</Step>
-</Steps>
-
-## Custom ports
-
-By default, Mintlify uses port 3000. You can customize the port Mintlify runs on by using the `--port` flag. For example, to run Mintlify on port 3333, use this command:
-
-```bash
-mint dev --port 3333
-```
-
-If you attempt to run Mintlify on a port that's already in use, it will use the next available port:
-
-```md
-Port 3000 is already in use. Trying 3001 instead.
-```
-
-## Mintlify versions
-
-Please note that each CLI release is associated with a specific version of Mintlify. If your local preview does not align with the production version, please update the CLI:
-
-```bash
-npm mint update
-```
-
-## Validating links
-
-The CLI can assist with validating links in your documentation. To identify any broken links, use the following command:
-
-```bash
-mint broken-links
-```
-
-## Deployment
-
-If the deployment is successful, you should see the following:
-
-<Frame>
-  <img src="/images/checks-passed.png" alt="Screenshot of a deployment confirmation message that says All checks have passed." style={{ borderRadius: '0.5rem' }} />
-</Frame>
-
-## Code formatting
-
-We suggest using extensions on your IDE to recognize and format MDX. If you're a VSCode user, consider the [MDX VSCode extension](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-mdx) for syntax highlighting, and [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting.
-
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion title='Error: Could not load the "sharp" module using the darwin-arm64 runtime'>
-
-    This may be due to an outdated version of node. Try the following:
-    1. Remove the currently-installed version of the CLI: `npm remove -g mint`
-    2. Upgrade to Node v19 or higher.
-    3. Reinstall the CLI: `npm i -g mint`
-  </Accordion>
-
-  <Accordion title="Issue: Encountering an unknown error">
-  
-    Solution: Go to the root of your device and delete the `~/.mintlify` folder. Then run `mint dev` again.
-  </Accordion>
-</AccordionGroup>
-
-Curious about what changed in the latest CLI version? Check out the [CLI changelog](https://www.npmjs.com/package/mintlify?activeTab=versions).
+The local preview is usually available at `http://localhost:3000`.

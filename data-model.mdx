@@ -1,0 +1,47 @@
+---
+title: "Data Model"
+description: "Supabase schema and realtime tables used by AbabilPay."
+---
+
+All application data lives in Supabase PostgreSQL. Supabase Auth UID is the foreign key across user-owned data, and Row Level Security policies enforce tenant and user boundaries.
+
+## Core tables
+
+| Table | Key columns | Purpose |
+| --- | --- | --- |
+| `users` | `id`, `email`, `google_id`, `kyc_status`, `role`, `created_at` | User accounts with Google OAuth link. |
+| `wallets` | `id`, `user_id`, `circle_wallet_id`, `chain`, `balance_usdc`, `updated_at` | One wallet row per chain per user. |
+| `transactions` | `id`, `wallet_id`, `type`, `amount_usdc`, `token_in`, `chain`, `status`, `tx_hash`, `created_at` | Every payment, swap, bridge, deposit, and transfer event. |
+| `invoices` | `id`, `merchant_id`, `customer_email`, `amount_usdc`, `status`, `due_date`, `pdf_url` | Invoice lifecycle from draft to paid. |
+| `invoice_items` | `id`, `invoice_id`, `description`, `quantity`, `unit_price_usdc` | Line items per invoice. |
+| `splits` | `id`, `created_by`, `total_usdc`, `description`, `status`, `expires_at` | Group bill split sessions. |
+| `split_participants` | `id`, `split_id`, `user_id`, `amount_usdc`, `paid_at` | Participant payment status. |
+| `merchants` | `id`, `user_id`, `store_name`, `shopify_domain`, `api_key_hash`, `webhook_secret` | Merchant profile and plugin configuration. |
+| `payroll_batches` | `id`, `merchant_id`, `total_usdc`, `recipient_count`, `status`, `executed_at` | Bulk payment batch jobs. |
+| `payroll_items` | `id`, `batch_id`, `recipient_wallet`, `amount_usdc`, `status`, `tx_hash` | Individual payroll lines. |
+| `agent_logs` | `id`, `agent_type`, `action`, `context_json`, `result_json`, `risk_score`, `created_at` | Audit trail of AI agent actions. |
+| `agent_memory` | `id`, `user_id`, `content`, `embedding`, `created_at` | pgvector memory for AI agents. |
+| `webhooks` | `id`, `merchant_id`, `url`, `events`, `secret`, `last_status`, `last_fired_at` | Merchant webhook subscriptions. |
+| `notifications` | `id`, `user_id`, `type`, `message`, `read`, `created_at` | In-app and push notification log. |
+| `address_book` | `id`, `user_id`, `label`, `wallet_address`, `chain`, `created_at` | Saved recipient wallets. |
+
+## Realtime tables
+
+Supabase Realtime should be enabled for:
+
+- `transactions`
+- `invoices`
+- `splits`
+- `notifications`
+
+Frontend clients subscribe to user-scoped channels so balances, invoice status, split progress, and notifications update immediately after backend events are committed.
+
+## Security model
+
+| Area | Rule |
+| --- | --- |
+| User data | Users can access only rows linked to their Supabase Auth UID. |
+| Merchant data | Merchant API keys are stored as hashes. Webhook secrets are scoped per merchant. |
+| KYC documents | Uploaded to protected Supabase Storage buckets. |
+| AI action logs | Agents append logs but should not mutate historical audit entries. |
+| Enterprise approvals | Multi-sig approval state is required before protected transfer and payroll actions execute. |

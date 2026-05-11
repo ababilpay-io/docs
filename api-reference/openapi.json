@@ -1,16 +1,18 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "OpenAPI Plant Store",
-    "description": "A sample API that uses a plant store as an example to demonstrate features in the OpenAPI specification",
-    "license": {
-      "name": "MIT"
-    },
+    "title": "AbabilPay API",
+    "description": "REST API for USDC-native payments, invoices, transfers, bridging, payroll, refunds, balances, transactions, and webhook subscriptions.",
     "version": "1.0.0"
   },
   "servers": [
     {
-      "url": "http://sandbox.mintlify.com"
+      "url": "https://api.ababilpay.io",
+      "description": "Production"
+    },
+    {
+      "url": "https://sandbox.api.ababilpay.io",
+      "description": "Sandbox"
     }
   ],
   "security": [
@@ -19,76 +21,29 @@
     }
   ],
   "paths": {
-    "/plants": {
-      "get": {
-        "description": "Returns all plants from the system that the user has access to",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "The maximum number of results to return",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Plant"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
+    "/v1/payments/intent": {
       "post": {
-        "description": "Creates a new plant in the store",
+        "summary": "Create payment intent",
+        "description": "Creates a hosted payment link. Customers can pay with supported tokens and the merchant settles in USDC.",
+        "operationId": "createPaymentIntent",
+        "tags": ["Payments"],
         "requestBody": {
-          "description": "Plant to add to the store",
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NewPlant"
+                "$ref": "#/components/schemas/CreatePaymentIntentRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
-          "200": {
-            "description": "plant response",
+          "201": {
+            "description": "Payment intent created",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Plant"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PaymentIntent"
                 }
               }
             }
@@ -96,122 +51,682 @@
         }
       }
     },
-    "/plants/{id}": {
-      "delete": {
-        "description": "Deletes a single plant based on the ID supplied",
+    "/v1/payments/{id}": {
+      "get": {
+        "summary": "Get payment status",
+        "operationId": "getPayment",
+        "tags": ["Payments"],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "ID of plant to delete",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
+            "$ref": "#/components/parameters/Id"
           }
         ],
         "responses": {
-          "204": {
-            "description": "Plant deleted",
-            "content": {}
-          },
-          "400": {
-            "description": "unexpected error",
+          "200": {
+            "description": "Payment details",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PaymentIntent"
                 }
               }
             }
           }
         }
       }
-    }
-  },
-  "webhooks": {
-    "/plant/webhook": {
+    },
+    "/v1/invoices": {
       "post": {
-        "description": "Information about a new plant added to the store",
+        "summary": "Create invoice",
+        "operationId": "createInvoice",
+        "tags": ["Invoices"],
         "requestBody": {
-          "description": "Plant added to the store",
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NewPlant"
+                "$ref": "#/components/schemas/CreateInvoiceRequest"
               }
             }
           }
         },
         "responses": {
+          "201": {
+            "description": "Invoice created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/invoices/{id}/send": {
+      "post": {
+        "summary": "Send invoice",
+        "operationId": "sendInvoice",
+        "tags": ["Invoices"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
           "200": {
-            "description": "Return a 200 status to indicate that the data was received successfully"
+            "description": "Invoice sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/transfers": {
+      "post": {
+        "summary": "Send USDC",
+        "description": "Sends USDC to a wallet address or an email-resolved AbabilPay wallet.",
+        "operationId": "createTransfer",
+        "tags": ["Transfers"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transfer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bridge": {
+      "post": {
+        "summary": "Bridge USDC",
+        "description": "Initiates a Circle CCTP transfer between supported chains.",
+        "operationId": "createBridgeTransfer",
+        "tags": ["Bridge"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBridgeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bridge transfer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payroll/batch": {
+      "post": {
+        "summary": "Create payroll batch",
+        "operationId": "createPayrollBatch",
+        "tags": ["Payroll"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePayrollBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payroll batch created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollBatch"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/wallet/balance": {
+      "get": {
+        "summary": "Get unified wallet balance",
+        "operationId": "getWalletBalance",
+        "tags": ["Wallet"],
+        "responses": {
+          "200": {
+            "description": "Unified USDC balance and per-chain breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletBalance"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/refunds": {
+      "post": {
+        "summary": "Issue refund",
+        "operationId": "createRefund",
+        "tags": ["Refunds"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRefundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Refund created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/transactions": {
+      "get": {
+        "summary": "List transactions",
+        "operationId": "listTransactions",
+        "tags": ["Transactions"],
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Chain"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["payment", "deposit", "swap", "bridge", "transfer", "refund", "payroll"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Transaction"
+                      }
+                    }
+                  },
+                  "required": ["data"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks": {
+      "post": {
+        "summary": "Register webhook endpoint",
+        "operationId": "createWebhook",
+        "tags": ["Webhooks"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook endpoint registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookEndpoint"
+                }
+              }
+            }
           }
         }
       }
     }
   },
   "components": {
-    "schemas": {
-      "Plant": {
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "The name of the plant",
-            "type": "string"
-          },
-          "tag": {
-            "description": "Tag to specify the type",
-            "type": "string"
-          }
-        }
-      },
-      "NewPlant": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Plant"
-          },
-          {
-            "required": [
-              "id"
-            ],
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "Identification number of the plant",
-                "type": "integer",
-                "format": "int64"
-              }
-            }
-          }
-        ]
-      },
-      "Error": {
-        "required": [
-          "error",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      }
-    },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
-        "scheme": "bearer"
+        "scheme": "bearer",
+        "bearerFormat": "API key"
+      }
+    },
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "Chain": {
+        "type": "string",
+        "enum": ["ethereum", "polygon", "base", "arbitrum", "solana", "avalanche"]
+      },
+      "Status": {
+        "type": "string",
+        "enum": ["pending", "processing", "completed", "failed", "cancelled"]
+      },
+      "CreatePaymentIntentRequest": {
+        "type": "object",
+        "properties": {
+          "amount_usdc": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "customer_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "description": {
+            "type": "string"
+          },
+          "success_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "cancel_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["amount_usdc"]
+      },
+      "PaymentIntent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pay_01HX7M2S9R5"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "amount_usdc": {
+            "type": "number"
+          },
+          "payment_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "status", "amount_usdc", "payment_url"]
+      },
+      "CreateInvoiceRequest": {
+        "type": "object",
+        "properties": {
+          "customer_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency_display": {
+            "type": "string",
+            "example": "USD"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceItem"
+            }
+          }
+        },
+        "required": ["customer_email", "items"]
+      },
+      "InvoiceItem": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "unit_price_usdc": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": ["description", "quantity", "unit_price_usdc"]
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "inv_01HX7M6B2Q"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["draft", "sent", "viewed", "paid", "overdue", "cancelled"]
+          },
+          "amount_usdc": {
+            "type": "number"
+          },
+          "payment_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "pdf_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": ["id", "status", "amount_usdc"]
+      },
+      "CreateTransferRequest": {
+        "type": "object",
+        "properties": {
+          "amount_usdc": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "recipient": {
+            "type": "string",
+            "description": "Wallet address or email address."
+          },
+          "chain": {
+            "$ref": "#/components/schemas/Chain"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": ["amount_usdc", "recipient"]
+      },
+      "CreateBridgeRequest": {
+        "type": "object",
+        "properties": {
+          "amount_usdc": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "source_chain": {
+            "$ref": "#/components/schemas/Chain"
+          },
+          "destination_chain": {
+            "$ref": "#/components/schemas/Chain"
+          }
+        },
+        "required": ["amount_usdc", "source_chain", "destination_chain"]
+      },
+      "CreatePayrollBatchRequest": {
+        "type": "object",
+        "properties": {
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recipient": {
+                  "type": "string"
+                },
+                "amount_usdc": {
+                  "type": "number"
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "required": ["recipient", "amount_usdc"]
+            }
+          }
+        },
+        "required": ["recipients"]
+      },
+      "PayrollBatch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "payroll_01HX8"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "total_usdc": {
+            "type": "number"
+          },
+          "recipient_count": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "status", "total_usdc", "recipient_count"]
+      },
+      "WalletBalance": {
+        "type": "object",
+        "properties": {
+          "total_usdc": {
+            "type": "number"
+          },
+          "chains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "chain": {
+                  "$ref": "#/components/schemas/Chain"
+                },
+                "balance_usdc": {
+                  "type": "number"
+                }
+              },
+              "required": ["chain", "balance_usdc"]
+            }
+          }
+        },
+        "required": ["total_usdc", "chains"]
+      },
+      "CreateRefundRequest": {
+        "type": "object",
+        "properties": {
+          "payment_id": {
+            "type": "string"
+          },
+          "amount_usdc": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": ["payment_id"]
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "txn_01HX9"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "amount_usdc": {
+            "type": "number"
+          },
+          "chain": {
+            "$ref": "#/components/schemas/Chain"
+          },
+          "tx_hash": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "type", "status", "amount_usdc", "created_at"]
+      },
+      "CreateWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebhookEvent"
+            }
+          }
+        },
+        "required": ["url", "events"]
+      },
+      "WebhookEndpoint": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "wh_01HX"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebhookEvent"
+            }
+          },
+          "secret": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "url", "events"]
+      },
+      "WebhookEvent": {
+        "type": "string",
+        "enum": [
+          "payment.completed",
+          "payment.failed",
+          "invoice.paid",
+          "invoice.overdue",
+          "refund.issued",
+          "bridge.completed",
+          "payroll.batch_completed",
+          "fraud.flagged"
+        ]
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "Payments"
+    },
+    {
+      "name": "Invoices"
+    },
+    {
+      "name": "Transfers"
+    },
+    {
+      "name": "Bridge"
+    },
+    {
+      "name": "Payroll"
+    },
+    {
+      "name": "Wallet"
+    },
+    {
+      "name": "Refunds"
+    },
+    {
+      "name": "Transactions"
+    },
+    {
+      "name": "Webhooks"
+    }
+  ]
 }
