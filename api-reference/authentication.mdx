@@ -11,16 +11,11 @@ All merchant API calls require a Bearer API key in the `Authorization` header.
 Authorization: Bearer sk_test_xxxxxxxxxxxxxxxxxxxx
 ```
 
-API keys are created from the **Ababil Dashboard → API Keys**. Two key types are issued:
+API keys are created from the **Ababil Dashboard → API Keys**.
 
 | Prefix | Environment | Base URL |
 |---|---|---|
-| `sk_test_...` | Testnet | `https://testnetv1.ababilpay.xyz` |
-| `sk_live_...` | Production | `https://ababilpay.com` |
-
-<Warning>
-  **Never cross environments.** `sk_test_` keys only work against `testnetv1.ababilpay.xyz`. `sk_live_` keys only work against `ababilpay.com`. Mixing them returns `INVALID_API_KEY`.
-</Warning>
+| `sk_test_...` | Testnet v1 | `https://testnetv1.ababilpay.xyz` |
 
 <Warning>
   **Keep keys server-side.** Merchant API keys must never be exposed in browser or mobile client code. For browser-initiated flows, use the [Hosted Gateway](/api-reference/hosted-gateway) or issue short-lived tokens from your backend.

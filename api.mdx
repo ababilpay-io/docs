@@ -9,16 +9,18 @@ description: "Ababil x402 Payment Gateway — accept USDC payments across EVM ch
 
 ## What is Ababil?
 
-Ababil is an **x402-protocol payment facilitator**. Merchants accept USDC payments across Arc, Base, Ethereum, and Solana through a single API. AI agents can pay autonomously using EIP-3009 signed authorizations — no custodial wallets, no intermediaries. Funds flow peer-to-peer directly from buyer to merchant wallet.
+Ababil is a **payment infrastructure built on the x402 protocol**. It gives merchants a dashboard and a developer API to accept USDC payments across Arc, Base, Ethereum, and Solana — all from one integration.
+
+When a buyer pays using a merchant's API key, the USDC settles directly into that merchant's dashboard wallet. No intermediaries, no custodial accounts — funds land peer-to-peer. AI agents can pay autonomously using EIP-3009 signed authorizations, requiring nothing beyond a private key.
 
 Ababil acts as the **Facilitator** in the x402 protocol triangle:
 
 <CardGroup cols={3}>
   <Card title="Merchant" icon="store">
-    Creates a payment intent via API and receives a hosted checkout URL or raw payment requirements.
+    Uses the Ababil dashboard and API key to create payment intents. Received funds settle directly into the merchant's dashboard wallet.
   </Card>
   <Card title="Buyer" icon="user">
-    Human or AI agent that signs a USDC transfer authorization. No token approval transactions needed.
+    Human or AI agent that signs a USDC transfer authorization. No token approvals needed.
   </Card>
   <Card title="Ababil" icon="shield-check">
     Verifies the EIP-3009 signature and relays `transferWithAuthorization` on-chain. Never holds funds.
@@ -30,7 +32,6 @@ Ababil acts as the **Facilitator** in the x402 protocol triangle:
 | Environment | Base URL | Status |
 |---|---|---|
 | **Testnet v1** | `https://testnetv1.ababilpay.xyz` | ✅ Live |
-| **Local dev** | `http://localhost:3000` | — |
 
 All API endpoints are prefixed with `/api/v1`:
 
