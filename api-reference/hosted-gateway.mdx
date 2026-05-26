@@ -1,0 +1,180 @@
+---
+title: "Hosted Gateway"
+description: "Path A — redirect buyers to Ababil's managed checkout page. Recommended for human buyers in e-commerce and invoice flows."
+---
+
+The Hosted Gateway is the fastest integration path. After creating a payment intent, redirect the buyer to Ababil's hosted checkout page. Ababil handles the full payment experience — wallet connect (MetaMask, Coinbase Wallet, Phantom), chain selection, EIP-3009 signing, on-chain settlement, and post-payment confirmation.
+
+**You write:** ~10 lines of backend code.
+**Ababil handles:** Everything else.
+
+<Note>
+  The Hosted Gateway requires a browser wallet. For AI agents paying programmatically, use the [Custom Integration](/api-reference/custom-integration) path instead.
+</Note>
+
+## Flow
+
+```
+Merchant backend
+  → POST /api/v1/x402/intents { amount_usdc, redirect_url, cancel_url }
+  ← { checkout_url: "https://testnetv1.ababilpay.xyz/pay/{id}" }
+
+Redirect buyer to checkout_url
+  → Buyer connects wallet, selects chain, signs EIP-3009 authorization
+  → Ababil verifies signature and settles on-chain
+  → Ababil redirects buyer to redirect_url?intent_id={id}
+
+Merchant backend confirms payment:
+  → GET /api/v1/x402/intents/{id}
+  ← { status: "paid", tx_hash: "0x...", paid_at: "..." }
+```
+
+---
+
+## Step 1 — Create Intent
+
+```http
+POST https://testnetv1.ababilpay.xyz/api/v1/x402/intents
+Authorization: Bearer sk_test_...
+Content-Type: application/json
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `amount_usdc` | number | ✓ | Payment amount in USDC. E.g. `29.99`. |
+| `redirect_url` | string | ✓ | Where to send the buyer after successful payment. |
+| `cancel_url` | string | | Where to send the buyer if they cancel. |
+| `description` | string | | Human-readable label shown on the checkout page. |
+| `order_id` | string | | Your internal order reference for reconciliation. |
+| `metadata` | object | | Arbitrary key-value pairs stored on the intent. |
+
+```json
+{
+  "amount_usdc":  29.99,
+  "description":  "Pro Plan — 1 month",
+  "order_id":     "order_8821",
+  "redirect_url": "https://yourstore.com/order/success",
+  "cancel_url":   "https://yourstore.com/cart",
+  "metadata":     { "customer_id": "usr_123" }
+}
+```
+
+### Response `201`
+
+```json
+{
+  "success": true,
+  "data": {
+    "intent_id":    "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+    "status":       "pending",
+    "amount_usdc":  29.99,
+    "order_id":     "order_8821",
+    "checkout_url": "https://testnetv1.ababilpay.xyz/pay/d03e0751-5a79-4b33-aa0e-d33dee344f27",
+    "expires_at":   "2026-05-25T13:00:00Z"
+  }
+}
+```
+
+Redirect the buyer to `checkout_url`. Intents expire after **30 minutes**.
+
+---
+
+## Step 2 — Redirect the Buyer
+
+After receiving the `checkout_url`, redirect the buyer immediately:
+
+<CodeGroup>
+
+```javascript Node.js
+const BASE = "https://testnetv1.ababilpay.xyz"
+
+async function createCheckout(orderId, amountUsdc) {
+  const res = await fetch(`${BASE}/api/v1/x402/intents`, {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer sk_test_...",
+      "Content-Type":  "application/json",
+    },
+    body: JSON.stringify({
+      amount_usdc:  amountUsdc,
+      description:  "Pro Plan — 1 month",
+      order_id:     orderId,
+      redirect_url: "https://yourstore.com/order/success",
+      cancel_url:   "https://yourstore.com/cart",
+    }),
+  })
+
+  const { data } = await res.json()
+  return data.checkout_url  // → redirect buyer to this URL
+}
+```
+
+```python Python
+import requests
+
+BASE = "https://testnetv1.ababilpay.xyz"
+
+def create_checkout(order_id: str, amount_usdc: float) -> str:
+    res = requests.post(
+        f"{BASE}/api/v1/x402/intents",
+        headers={
+            "Authorization": "Bearer sk_test_...",
+            "Content-Type": "application/json",
+        },
+        json={
+            "amount_usdc":  amount_usdc,
+            "description":  "Pro Plan — 1 month",
+            "order_id":     order_id,
+            "redirect_url": "https://yourstore.com/order/success",
+            "cancel_url":   "https://yourstore.com/cart",
+        },
+    )
+    res.raise_for_status()
+    return res.json()["data"]["checkout_url"]  # redirect buyer here
+```
+
+</CodeGroup>
+
+---
+
+## Step 3 — Confirm Payment
+
+After the buyer is sent back to your `redirect_url`, poll the intent status before fulfilling the order.
+
+<Warning>
+  **Always verify via the API.** The redirect URL fires on success but can be interrupted (browser close, network drop). Never fulfil an order based on the redirect alone — confirm `status: "paid"` via `GET /api/v1/x402/intents/{id}` first.
+</Warning>
+
+```javascript
+async function waitForPayment(intentId, timeoutMs = 120_000) {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    const res = await fetch(`${BASE}/api/v1/x402/intents/${intentId}`, {
+      headers: { "Authorization": "Bearer sk_test_..." },
+    })
+    const { data } = await res.json()
+
+    if (data.status === "paid")    return data              // ✅ fulfil order
+    if (data.status === "expired") throw new Error("Payment expired")
+
+    await new Promise((r) => setTimeout(r, 3000))           // poll every 3s
+  }
+
+  throw new Error("Timeout waiting for payment")
+}
+```
+
+**Poll interval:** Every 3–5 seconds. Settlement is typically 1–10 seconds depending on chain.
+
+A paid intent response includes:
+
+| Field | Description |
+|---|---|
+| `status` | `"paid"` |
+| `tx_hash` | On-chain transaction hash |
+| `buyer_address` | Buyer wallet address |
+| `chain` | CAIP-2 chain the payment settled on |
+| `paid_at` | ISO 8601 settlement timestamp |

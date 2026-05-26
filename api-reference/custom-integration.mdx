@@ -1,0 +1,378 @@
+---
+title: "Custom Integration"
+description: "Path B — build your own payment UI. Your frontend signs the EIP-3009 authorization; Ababil verifies and settles on-chain."
+---
+
+The Custom Integration path gives you full control over the payment UX. You build the wallet connect flow, construct and sign the EIP-3009 typed data, then call Ababil's `/pay` endpoint to settle. Ababil handles signature verification and the on-chain relay only.
+
+**You write:** Frontend wallet connect, chain switching, EIP-3009 signing logic, and one settlement call.
+**Ababil handles:** Signature verification, USDC balance check, on-chain `transferWithAuthorization`, and intent status update.
+
+<Note>
+  This path is required for AI agents paying programmatically. For browser-based human buyers, the [Hosted Gateway](/api-reference/hosted-gateway) is simpler to implement.
+</Note>
+
+## Flow
+
+```
+Merchant backend
+  → POST /api/v1/x402/intents { amount_usdc }
+  ← { intent_id, payment_requirements: [...] }
+
+Merchant frontend
+  → Connect buyer wallet (wagmi / viem / ethers / Phantom)
+  → Select the payment_requirement matching the buyer's chain
+  → Sign TransferWithAuthorization typed data (EVM) or Solana transaction
+  → POST /api/v1/x402/pay { intent_id, payment_signature }
+  ← { success: true, tx_hash, settled_at }
+```
+
+---
+
+## Step 1 — Create Intent
+
+```http
+POST https://testnetv1.ababilpay.xyz/api/v1/x402/intents
+Authorization: Bearer sk_test_...
+Content-Type: application/json
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `amount_usdc` | number | ✓ | Payment amount in USDC. E.g. `29.99`. |
+| `description` | string | | Human-readable label. |
+| `order_id` | string | | Your internal order reference. |
+| `metadata` | object | | Arbitrary key-value pairs stored on the intent. |
+
+```json
+{
+  "amount_usdc": 29.99,
+  "description": "Pro Plan — 1 month",
+  "order_id":    "order_8821",
+  "metadata":    { "customer_id": "usr_123" }
+}
+```
+
+### Response `201`
+
+```json
+{
+  "success": true,
+  "data": {
+    "intent_id":   "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+    "status":      "pending",
+    "amount_usdc": 29.99,
+    "order_id":    "order_8821",
+    "expires_at":  "2026-05-25T13:00:00Z",
+    "checkout_url": "https://testnetv1.ababilpay.xyz/pay/d03e0751-5a79-4b33-aa0e-d33dee344f27",
+    "payment_requirements": [
+      {
+        "scheme":           "exact",
+        "network":          "eip155:84532",
+        "maxAmountRequired": "29990000",
+        "payTo":            "0xMerchantWalletAddress",
+        "asset":            "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        "maxTimeoutSeconds": 1800,
+        "usdcDomainName":   "USDC",
+        "x402Version":      1
+      },
+      {
+        "scheme":           "exact",
+        "network":          "eip155:5042002",
+        "maxAmountRequired": "29990000",
+        "payTo":            "0xMerchantWalletAddress",
+        "asset":            "0x3600000000000000000000000000000000000000",
+        "maxTimeoutSeconds": 1800,
+        "usdcDomainName":   "USDC",
+        "x402Version":      1
+      }
+    ],
+    "supported_chains": ["eip155:84532", "eip155:5042002", "solana:devnet"]
+  }
+}
+```
+
+**Key fields:**
+
+| Field | Description |
+|---|---|
+| `payment_requirements` | One entry per chain the merchant supports. Pick the one matching the buyer's chain. |
+| `maxAmountRequired` | Amount in atomic USDC units (×1,000,000). `$29.99` = `"29990000"`. |
+| `usdcDomainName` | Always read from the API — never hardcode `"USD Coin"`. |
+| `payTo` | Merchant wallet address. Used as `to` in the EIP-3009 signature. |
+| `checkout_url` | Available even on custom integrations — use it as a fallback if needed. |
+
+---
+
+## Step 2a — Sign EIP-3009 (EVM: Base, Ethereum, Arc)
+
+Build and sign a `TransferWithAuthorization` EIP-712 typed data message with the buyer's wallet.
+
+### Typed Data Structure
+
+```json
+{
+  "domain": {
+    "name":              "<usdcDomainName from payment_requirements>",
+    "version":           "2",
+    "chainId":           84532,
+    "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "types": {
+    "TransferWithAuthorization": [
+      { "name": "from",        "type": "address" },
+      { "name": "to",          "type": "address" },
+      { "name": "value",       "type": "uint256" },
+      { "name": "validAfter",  "type": "uint256" },
+      { "name": "validBefore", "type": "uint256" },
+      { "name": "nonce",       "type": "bytes32" }
+    ]
+  },
+  "primaryType": "TransferWithAuthorization",
+  "message": {
+    "from":        "0xBuyerAddress",
+    "to":          "<payTo from payment_requirements>",
+    "value":       "<maxAmountRequired as BigInt>",
+    "validAfter":  "0",
+    "validBefore": "<unix timestamp — Math.floor(Date.now()/1000) + 900>",
+    "nonce":       "<random 32-byte hex — e.g. 0x7752857d...>"
+  }
+}
+```
+
+### Signing Rules
+
+<Warning>
+  **`usdcDomainName`** — always use the value from `payment_requirements[n].usdcDomainName`. All testnet chains return `"USDC"`. **Never hardcode `"USD Coin"`** — it will produce an invalid signature.
+</Warning>
+
+<Warning>
+  **`nonce`** — must be a **random `bytes32`** value, not a counter. The USDC contract records used nonces permanently; reusing any nonce will always fail with `INVALID_SIGNATURE`.
+</Warning>
+
+| Field | Rule |
+|---|---|
+| `domain.name` | Read `usdcDomainName` from `payment_requirements` — do not hardcode |
+| `domain.chainId` | Parse from `payment_requirements[n].network` — e.g. `"eip155:84532"` → `84532` |
+| `domain.verifyingContract` | The `asset` field from `payment_requirements[n]` |
+| `message.to` | The `payTo` field from `payment_requirements[n]` |
+| `message.value` | `BigInt(maxAmountRequired)` — integer atomic units, not a float |
+| `message.validAfter` | `0n` (no lower bound) |
+| `message.validBefore` | `BigInt(Math.floor(Date.now() / 1000) + 900)` — must be before intent `expires_at` |
+| `message.nonce` | Fresh `crypto.getRandomValues(new Uint8Array(32))` — never reuse |
+| Sign method | `eth_signTypedData_v4` |
+
+### Code Examples
+
+<CodeGroup>
+
+```typescript React / wagmi
+import { useSignTypedData, useAccount } from "wagmi"
+
+const { signTypedDataAsync } = useSignTypedData()
+const { address } = useAccount()
+
+async function signPayment(req: PaymentRequirement) {
+  const chainId     = parseInt(req.network.split(":")[1])   // "eip155:84532" → 84532
+  const nonce       = `0x${crypto.getRandomValues(new Uint8Array(32))
+    .reduce((s, b) => s + b.toString(16).padStart(2, "0"), "")}`
+  const validBefore = BigInt(Math.floor(Date.now() / 1000) + 900)
+
+  return signTypedDataAsync({
+    domain: {
+      name:              req.usdcDomainName,         // from API — never hardcode
+      version:           "2",
+      chainId,
+      verifyingContract: req.asset as `0x${string}`,
+    },
+    types: {
+      TransferWithAuthorization: [
+        { name: "from",        type: "address" },
+        { name: "to",          type: "address" },
+        { name: "value",       type: "uint256" },
+        { name: "validAfter",  type: "uint256" },
+        { name: "validBefore", type: "uint256" },
+        { name: "nonce",       type: "bytes32" },
+      ],
+    },
+    primaryType: "TransferWithAuthorization",
+    message: {
+      from:        address!,
+      to:          req.payTo as `0x${string}`,
+      value:       BigInt(req.maxAmountRequired),
+      validAfter:  0n,
+      validBefore,
+      nonce:       nonce as `0x${string}`,
+    },
+  })
+}
+```
+
+```typescript viem (server / Node.js)
+import { createWalletClient, http } from "viem"
+import { privateKeyToAccount } from "viem/accounts"
+import { baseSepolia } from "viem/chains"
+import { randomBytes } from "crypto"
+
+const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`)
+const client  = createWalletClient({ account, chain: baseSepolia, transport: http() })
+
+async function signPayment(req: PaymentRequirement) {
+  const chainId     = parseInt(req.network.split(":")[1])
+  const nonce       = `0x${randomBytes(32).toString("hex")}` as `0x${string}`
+  const validBefore = BigInt(Math.floor(Date.now() / 1000) + 900)
+
+  return client.signTypedData({
+    domain: {
+      name:              req.usdcDomainName,
+      version:           "2",
+      chainId,
+      verifyingContract: req.asset as `0x${string}`,
+    },
+    types: {
+      TransferWithAuthorization: [
+        { name: "from",        type: "address" },
+        { name: "to",          type: "address" },
+        { name: "value",       type: "uint256" },
+        { name: "validAfter",  type: "uint256" },
+        { name: "validBefore", type: "uint256" },
+        { name: "nonce",       type: "bytes32" },
+      ],
+    },
+    primaryType: "TransferWithAuthorization",
+    message: {
+      from:        account.address,
+      to:          req.payTo as `0x${string}`,
+      value:       BigInt(req.maxAmountRequired),
+      validAfter:  0n,
+      validBefore,
+      nonce,
+    },
+  })
+}
+```
+
+</CodeGroup>
+
+---
+
+## Step 2b — Sign Solana SPL Transfer
+
+Solana uses a two-step process: first fetch an unsigned transaction from Ababil (which requires the buyer's public key), then sign it with the buyer's Solana wallet.
+
+### 2b.1 — Build the Unsigned Transaction
+
+```http
+POST https://testnetv1.ababilpay.xyz/api/v1/x402/intents/{intent_id}/solana-tx
+Authorization: Bearer sk_test_...
+Content-Type: application/json
+```
+
+```json
+{ "buyer_address": "BuyerSolanaPublicKey" }
+```
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "transaction_b64": "AQAAAAAA...",
+    "buyer_ata":       "BuyerUSDCTokenAccountAddress",
+    "merchant_ata":    "MerchantUSDCTokenAccountAddress"
+  }
+}
+```
+
+### 2b.2 — Sign with Phantom (browser)
+
+```javascript
+import { Transaction } from "@solana/web3.js"
+
+const tx     = Transaction.from(Buffer.from(data.transaction_b64, "base64"))
+const signed = await window.solana.signTransaction(tx)
+
+const signedB64 = signed.serialize().toString("base64")
+// → pass signedB64 as payload.signedTransaction in the /pay call
+```
+
+---
+
+## Step 3 — Settle Payment
+
+Submit the signed authorization to Ababil for on-chain settlement.
+
+```http
+POST https://testnetv1.ababilpay.xyz/api/v1/x402/pay
+Authorization: Bearer sk_test_...
+Content-Type: application/json
+```
+
+<Tabs>
+  <Tab title="EVM (Base / Ethereum / Arc)">
+
+```json
+{
+  "intent_id": "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+  "payment_signature": {
+    "scheme":      "exact",
+    "network":     "eip155:84532",
+    "x402Version": 1,
+    "payload": {
+      "from":        "0xBuyerAddress",
+      "to":          "0xMerchantAddress",
+      "value":       "29990000",
+      "validAfter":  "0",
+      "validBefore": "1748300000",
+      "nonce":       "0x7752857d0573f5b96236f829b4f22b438a65f3bb0e2bcc4bcc7473bad9ff6c1",
+      "signature":   "0xacb8e1f52d9372eeb113fe686408e8c6893c..."
+    }
+  }
+}
+```
+
+  </Tab>
+  <Tab title="Solana Devnet">
+
+```json
+{
+  "intent_id": "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+  "payment_signature": {
+    "scheme":      "exact",
+    "network":     "solana:devnet",
+    "x402Version": 1,
+    "payload": {
+      "signedTransaction": "base64encodedSignedTransaction"
+    }
+  }
+}
+```
+
+  </Tab>
+</Tabs>
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "tx_hash":    "0xf4753b209212ece119cb099f8f499efb6a4df031...",
+    "settled_at": "2026-05-25T12:05:00Z",
+    "amount_usdc": 29.99,
+    "network":    "eip155:84532"
+  }
+}
+```
+
+### What Ababil Does Server-Side
+
+1. Validates the EIP-3009 signature (viem `verifyTypedData`) or Solana transaction signatures.
+2. Checks the buyer's USDC balance is sufficient.
+3. Confirms the intent is still `pending` and not expired.
+4. Calls `usdc.transferWithAuthorization(from, to, value, validAfter, validBefore, nonce, v, r, s)` via relay EOA.
+5. USDC moves directly buyer → merchant. Ababil **never holds funds**.
+6. Marks the intent `paid` in the database with `tx_hash`, `buyer_address`, and `paid_at`.

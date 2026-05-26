@@ -1,5 +1,79 @@
 ---
-title: "API"
+title: "API Reference"
+description: "Ababil x402 Payment Gateway — accept USDC payments across EVM chains and Solana through a single API."
 ---
 
-Coming soon
+<Note>
+  All Ababil APIs are currently live on **testnet**. Production (mainnet) access is available by invitation — [contact us](mailto:contact@ababilpay.io) to apply.
+</Note>
+
+## What is Ababil?
+
+Ababil is an **x402-protocol payment facilitator**. Merchants accept USDC payments across Arc, Base, Ethereum, and Solana through a single API. AI agents can pay autonomously using EIP-3009 signed authorizations — no custodial wallets, no intermediaries. Funds flow peer-to-peer directly from buyer to merchant wallet.
+
+Ababil acts as the **Facilitator** in the x402 protocol triangle:
+
+<CardGroup cols={3}>
+  <Card title="Merchant" icon="store">
+    Creates a payment intent via API and receives a hosted checkout URL or raw payment requirements.
+  </Card>
+  <Card title="Buyer" icon="user">
+    Human or AI agent that signs a USDC transfer authorization. No token approval transactions needed.
+  </Card>
+  <Card title="Ababil" icon="shield-check">
+    Verifies the EIP-3009 signature and relays `transferWithAuthorization` on-chain. Never holds funds.
+  </Card>
+</CardGroup>
+
+## Base URLs
+
+| Environment | Base URL | Status |
+|---|---|---|
+| **Testnet** | `https://testnetv1.ababilpay.xyz` | ✅ Live |
+| **Production** | `https://ababilpay.com` | Invite only |
+| **Local dev** | `http://localhost:3000` | — |
+
+All API endpoints are prefixed with `/api/v1`:
+
+```
+https://testnetv1.ababilpay.xyz/api/v1
+```
+
+The hosted checkout page (buyer-facing UI) is served at:
+
+```
+https://testnetv1.ababilpay.xyz/pay/{intent_id}
+```
+
+## Integration Paths
+
+Ababil supports two integration patterns. Both start from the same intent creation endpoint.
+
+<CardGroup cols={2}>
+  <Card title="Hosted Gateway" icon="arrow-up-right-from-square" href="/api-reference/hosted-gateway">
+    Redirect buyers to Ababil's hosted checkout page. Wallet connect, signing, and settlement are fully managed. Recommended for human buyers. **~1 hour** to integrate.
+  </Card>
+  <Card title="Custom Integration" icon="code" href="/api-reference/custom-integration">
+    Build your own payment UI. Your frontend signs the EIP-3009 authorization; Ababil verifies and settles on-chain. Required for AI agents and white-label UIs. **~1 day** to integrate.
+  </Card>
+</CardGroup>
+
+| | Hosted Gateway | Custom Integration |
+|---|---|---|
+| Frontend work | None — redirect to Ababil URL | Build wallet connect + signing UI |
+| Backend work | Create intent, redirect, poll status | Create intent, relay signature to `/pay` |
+| Supported wallets | MetaMask, Coinbase Wallet, Phantom | Any wallet you connect |
+| AI agent support | ✗ Requires a browser | ✓ Sign with private key |
+| White-label UI | ✗ Ababil-branded page | ✓ Fully custom |
+| Integration time | ~1 hour | ~1 day |
+
+## Endpoints at a Glance
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/x402/intents` | Create a payment intent |
+| `GET` | `/api/v1/x402/intents/{id}` | Get intent status and details |
+| `GET` | `/api/v1/x402/intents` | List intents with filters |
+| `DELETE` | `/api/v1/x402/intents/{id}` | Cancel a pending intent |
+| `POST` | `/api/v1/x402/pay` | Settle payment (custom integration) |
+| `POST` | `/api/v1/x402/intents/{id}/solana-tx` | Build unsigned Solana transaction |

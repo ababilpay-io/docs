@@ -1,0 +1,38 @@
+---
+title: "Authentication"
+description: "Bearer API key authentication and rate limiting for the Ababil API."
+---
+
+## API Keys
+
+All merchant API calls require a Bearer API key in the `Authorization` header.
+
+```bash
+Authorization: Bearer sk_test_xxxxxxxxxxxxxxxxxxxx
+```
+
+API keys are created from the **Ababil Dashboard → API Keys**. Two key types are issued:
+
+| Prefix | Environment | Base URL |
+|---|---|---|
+| `sk_test_...` | Testnet | `https://testnetv1.ababilpay.xyz` |
+| `sk_live_...` | Production | `https://ababilpay.com` |
+
+<Warning>
+  **Never cross environments.** `sk_test_` keys only work against `testnetv1.ababilpay.xyz`. `sk_live_` keys only work against `ababilpay.com`. Mixing them returns `INVALID_API_KEY`.
+</Warning>
+
+<Warning>
+  **Keep keys server-side.** Merchant API keys must never be exposed in browser or mobile client code. For browser-initiated flows, use the [Hosted Gateway](/api-reference/hosted-gateway) or issue short-lived tokens from your backend.
+</Warning>
+
+## Rate Limiting
+
+The API enforces a limit of **60 requests per minute** per API key. Every response includes the following rate limit headers:
+
+| Header | Description |
+|---|---|
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp (seconds) when the window resets |
+
+When the limit is exceeded, the API returns HTTP `429` with error code `RATE_LIMITED`. Wait until `X-RateLimit-Reset` before retrying — do not retry immediately in a loop.

@@ -1,0 +1,29 @@
+---
+title: "Supported Networks"
+description: "EVM chains and Solana Devnet supported on the Ababil testnet."
+---
+
+<Note>
+  All networks below are **testnet**. A merchant must have a wallet registered on a given chain for that chain to appear in `payment_requirements` when creating an intent.
+</Note>
+
+## Testnet Networks
+
+| Network | CAIP-2 ID | Chain ID | USDC Contract | EIP-712 Domain |
+|---|---|---|---|---|
+| Base Sepolia | `eip155:84532` | `84532` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | `USDC` |
+| Ethereum Sepolia | `eip155:11155111` | `11155111` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` | `USDC` |
+| Arc Testnet | `eip155:5042002` | `5042002` | `0x3600000000000000000000000000000000000000` | `USDC` |
+| Solana Devnet | `solana:devnet` | N/A | `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` | N/A (SPL) |
+
+## Key Notes
+
+**Chain-agnostic intents** — payment intents automatically include all chains on which the merchant has a registered wallet. Buyers choose which supported chain to pay from at checkout.
+
+**EIP-712 domain name** — all testnet chains use `"USDC"` as the domain name. Never hardcode `"USD Coin"`. Always read `usdcDomainName` directly from the `payment_requirements` array returned by the API.
+
+**Solana** uses SPL token transfers rather than EIP-3009. The signing flow is different: a two-step process where an unsigned transaction is fetched first, then signed with a Solana wallet. See [Custom Integration — Solana](/api-reference/custom-integration#step-2b--sign-solana-spl-transfer) for full details.
+
+**Arc Testnet** is an EVM-compatible chain (Chain ID `5042002`) and uses the standard EIP-3009 signing flow — the same as Base and Ethereum.
+
+**USDC atomic units** — all amounts in the API are expressed in atomic USDC units (USDC × 1,000,000). $29.99 = `"29990000"`. Never pass float values to `value` or `maxAmountRequired`.

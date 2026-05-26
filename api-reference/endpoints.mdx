@@ -1,0 +1,110 @@
+---
+title: "Intent Endpoints"
+description: "Endpoints to retrieve, list, and cancel payment intents."
+---
+
+## Get Intent
+
+Retrieve the current status and details of a payment intent.
+
+```http
+GET https://testnetv1.ababilpay.xyz/api/v1/x402/intents/{intent_id}
+Authorization: Bearer sk_test_...
+```
+
+### Intent Status Values
+
+| Status | Description |
+|---|---|
+| `pending` | Created and awaiting payment. Expires after 30 minutes. |
+| `paid` | Fully settled on-chain. |
+| `expired` | Not paid within the 30-minute window. |
+| `cancelled` | Cancelled by the merchant before settlement. |
+
+### Paid Intent Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "intent_id":     "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+    "status":        "paid",
+    "amount_usdc":   29.99,
+    "order_id":      "order_8821",
+    "tx_hash":       "0xf4753b209212ece119cb099f8f499efb6a4df031...",
+    "buyer_address": "0xBuyerAddress",
+    "chain":         "eip155:84532",
+    "paid_at":       "2026-05-25T12:05:00Z",
+    "expires_at":    "2026-05-25T13:00:00Z"
+  }
+}
+```
+
+**Poll interval:** Every 3–5 seconds. Settlement is typically 1–10 seconds depending on chain.
+
+---
+
+## List Intents
+
+Retrieve a paginated list of payment intents for the authenticated merchant.
+
+```http
+GET https://testnetv1.ababilpay.xyz/api/v1/x402/intents
+Authorization: Bearer sk_test_...
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `status` | string | Filter by intent status: `pending`, `paid`, `expired`, `cancelled`. |
+| `order_id` | string | Filter by your internal order reference. |
+| `limit` | integer | Number of results to return. Max `100`, default `20`. |
+| `offset` | integer | Pagination offset. Default `0`. |
+
+```http
+GET /api/v1/x402/intents?status=paid&limit=50&offset=0
+```
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "intents": [ /* array of intent objects */ ],
+    "total":  142,
+    "limit":  50,
+    "offset": 0
+  }
+}
+```
+
+---
+
+## Cancel Intent
+
+Cancel a pending payment intent. Only intents with `status: "pending"` can be cancelled.
+
+```http
+DELETE https://testnetv1.ababilpay.xyz/api/v1/x402/intents/{intent_id}
+Authorization: Bearer sk_test_...
+```
+
+Returns `404` if the intent is already `paid` or `expired`.
+
+### Response `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "intent_id": "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+    "status":    "cancelled"
+  }
+}
+```
+
+<Note>
+  Cancelling an intent does not issue a refund — it simply prevents further payment attempts. If a buyer has already signed an authorization but settlement hasn't been submitted yet, cancellation will block that submission.
+</Note>

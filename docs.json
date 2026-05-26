@@ -49,8 +49,40 @@
       },
       {
         "tab": "API reference",
-        "pages": [
-          "api"
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api",
+              "api-reference/authentication",
+              "api-reference/networks"
+            ]
+          },
+          {
+            "group": "Integration Paths",
+            "pages": [
+              "api-reference/hosted-gateway",
+              "api-reference/custom-integration"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api-reference/endpoints"
+            ]
+          },
+          {
+            "group": "AI Agents",
+            "pages": [
+              "api-reference/ai-agents"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "api-reference/errors"
+            ]
+          }
         ]
       }
     ]

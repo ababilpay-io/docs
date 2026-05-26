@@ -1,0 +1,160 @@
+---
+title: "AI Agent Integration"
+description: "Enable autonomous USDC payments from AI agents using EIP-3009 — no browser wallet, no human interaction required."
+---
+
+AI agents can pay autonomously using EIP-3009 typed data signatures. The agent holds a private key, constructs and signs the `TransferWithAuthorization` typed data, and calls the settlement endpoint directly. No custodial wallets, no pre-approvals, no subscriptions — the EIP-3009 signature is the authorization.
+
+<Note>
+  AI agent payments require the [Custom Integration](/api-reference/custom-integration) path. The [Hosted Gateway](/api-reference/hosted-gateway) requires a browser wallet and is not suitable for agents.
+</Note>
+
+## Agent Payment Flow
+
+```
+1. Agent calls a resource → Server returns 402 with X-Payment-Required header,
+   or agent calls POST /api/v1/x402/intents directly to create an intent.
+
+2. Agent reads payment_requirements → picks the chain it has USDC on.
+
+3. Agent generates a random bytes32 nonce and sets validBefore = now + 900.
+
+4. Agent signs TransferWithAuthorization typed data with its private key.
+
+5. Agent calls POST /api/v1/x402/pay with the signature.
+
+6. On success (tx_hash in response), agent proceeds with its original task.
+```
+
+No human interaction is required at any step.
+
+---
+
+## Minimal Node.js Example (viem)
+
+```javascript
+import { privateKeyToAccount } from "viem/accounts"
+import { randomBytes } from "crypto"
+
+const BASE    = "https://testnetv1.ababilpay.xyz"
+const account = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY)
+
+async function agentPay(intentId, requirement) {
+  // 1. Derive chain ID from CAIP-2 network identifier
+  const chainId     = parseInt(requirement.network.split(":")[1])
+
+  // 2. Generate a fresh random nonce — never reuse
+  const nonce       = `0x${randomBytes(32).toString("hex")}`
+
+  // 3. Set validBefore to 15 minutes from now
+  const validBefore = BigInt(Math.floor(Date.now() / 1000) + 900)
+
+  // 4. Sign TransferWithAuthorization typed data
+  const signature = await account.signTypedData({
+    domain: {
+      name:              requirement.usdcDomainName,  // from API — "USDC"
+      version:           "2",
+      chainId,
+      verifyingContract: requirement.asset,
+    },
+    types: {
+      TransferWithAuthorization: [
+        { name: "from",        type: "address" },
+        { name: "to",          type: "address" },
+        { name: "value",       type: "uint256" },
+        { name: "validAfter",  type: "uint256" },
+        { name: "validBefore", type: "uint256" },
+        { name: "nonce",       type: "bytes32" },
+      ],
+    },
+    primaryType: "TransferWithAuthorization",
+    message: {
+      from:        account.address,
+      to:          requirement.payTo,
+      value:       BigInt(requirement.maxAmountRequired),
+      validAfter:  0n,
+      validBefore,
+      nonce,
+    },
+  })
+
+  // 5. Submit settlement request
+  const res = await fetch(`${BASE}/api/v1/x402/pay`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.MERCHANT_API_KEY}`,
+      "Content-Type":  "application/json",
+    },
+    body: JSON.stringify({
+      intent_id: intentId,
+      payment_signature: {
+        scheme:      "exact",
+        network:     requirement.network,
+        x402Version: 1,
+        payload: {
+          from:        account.address,
+          to:          requirement.payTo,
+          value:       requirement.maxAmountRequired,
+          validAfter:  "0",
+          validBefore: validBefore.toString(),
+          nonce,
+          signature,
+        },
+      },
+    }),
+  })
+
+  return res.json()
+  // → { success: true, data: { tx_hash, settled_at, amount_usdc, network } }
+}
+```
+
+---
+
+## End-to-End Agent Example
+
+```javascript
+async function payAndProceed(amountUsdc, task) {
+  // Create the payment intent
+  const intentRes = await fetch(`${BASE}/api/v1/x402/intents`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.MERCHANT_API_KEY}`,
+      "Content-Type":  "application/json",
+    },
+    body: JSON.stringify({ amount_usdc: amountUsdc }),
+  })
+  const { data: intent } = await intentRes.json()
+
+  // Pick a requirement — prefer Base Sepolia for speed and low fees
+  const requirement =
+    intent.payment_requirements.find((r) => r.network === "eip155:84532")
+    ?? intent.payment_requirements[0]
+
+  if (!requirement) throw new Error("No supported chain found")
+
+  // Sign and settle
+  const result = await agentPay(intent.intent_id, requirement)
+
+  if (!result.success) throw new Error(`Payment failed: ${result.error?.code}`)
+
+  console.log(`Payment settled: ${result.data.tx_hash}`)
+
+  // Proceed with the original task
+  return task()
+}
+```
+
+---
+
+## Key Considerations for Agents
+
+**Private key security** — store the agent's signing key in an environment variable or secrets manager. Never embed it in code or commit it to version control.
+
+**Chain selection** — query `payment_requirements` at runtime and select the chain your agent holds USDC on. Do not hardcode chain IDs.
+
+**Nonce management** — generate a fresh `crypto.randomBytes(32)` for every payment. The EIP-3009 nonce is not a counter; the USDC contract records each nonce permanently to prevent replay attacks.
+
+**Idempotency** — if a settlement call fails with a network error (timeout, 5xx), check the intent status (`GET /intents/{id}`) before retrying. The intent may have already been marked `paid` — retrying with the same or a new signature on a `paid` intent returns `ALREADY_PAID`.
+
+**USDC balance** — ensure your agent's wallet holds sufficient testnet USDC before executing payments. Insufficient balance causes `SETTLEMENT_FAILED`. See the [Supported Networks](/api-reference/networks) page for testnet USDC contract addresses.

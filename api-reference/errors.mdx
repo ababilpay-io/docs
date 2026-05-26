@@ -1,0 +1,143 @@
+---
+title: "Errors & Troubleshooting"
+description: "API error codes, HTTP status codes, and solutions to the most common integration mistakes."
+---
+
+## Error Response Format
+
+All API errors return a JSON body with a `success: false` flag and an `error` object:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code":    "INVALID_SIGNATURE",
+    "message": "EIP-3009 signature verification failed. Check usdcDomainName and chainId."
+  }
+}
+```
+
+---
+
+## Error Codes
+
+| Code | HTTP | Description |
+|---|---|---|
+| `INVALID_API_KEY` | `401` | Missing or invalid `Authorization` header. |
+| `RATE_LIMITED` | `429` | Too many requests. Check `X-RateLimit-Reset` header before retrying. |
+| `VALIDATION_ERROR` | `400` | Missing or invalid request fields. See `message` for details. |
+| `INTENT_NOT_FOUND` | `404` | Intent does not exist or belongs to a different merchant. |
+| `INTENT_EXPIRED` | `400` | Intent is past its 30-minute window. Create a new intent. |
+| `ALREADY_PAID` | `409` | Intent is already settled. Do not retry — check intent status first. |
+| `INVALID_SIGNATURE` | `400` | EIP-3009 signature failed verification. See troubleshooting below. |
+| `AMOUNT_MISMATCH` | `400` | Signed `value` is less than `maxAmountRequired`. |
+| `UNSUPPORTED_CHAIN` | `400` | Merchant has no registered wallet on the specified network. |
+| `SETTLEMENT_FAILED` | `502` | On-chain transaction failed. Check buyer USDC balance and relay gas. |
+| `NO_WALLET` | `400` | Merchant has no wallets configured on any chain. |
+
+---
+
+## Common Mistakes
+
+### Wrong `usdcDomainName`
+
+**Symptom:** `INVALID_SIGNATURE` on every attempt.
+
+**Cause:** Hardcoding `"USD Coin"` as the EIP-712 domain name.
+
+**Fix:** Always read `usdcDomainName` from `payment_requirements[n]`. All testnet chains return `"USDC"`.
+
+```javascript
+// ✗ Wrong — hardcoded
+domain: { name: "USD Coin", ... }
+
+// ✓ Correct — from API response
+domain: { name: requirement.usdcDomainName, ... }
+```
+
+---
+
+### Reusing a Nonce
+
+**Symptom:** `INVALID_SIGNATURE` on the second attempt with an otherwise valid signature.
+
+**Cause:** The USDC contract records every used nonce permanently. Any reuse — intentional or from copying a previous payload — always fails.
+
+**Fix:** Generate a fresh random `bytes32` for every payment.
+
+```javascript
+// ✓ Correct — fresh random nonce per payment
+const nonce = `0x${randomBytes(32).toString("hex")}`
+```
+
+---
+
+### Wrong `chainId` in EIP-712 Domain
+
+**Symptom:** `INVALID_SIGNATURE` even though the domain name and contract address look correct.
+
+**Cause:** The `chainId` in the EIP-712 domain does not match the chain in `payment_requirements[n].network`.
+
+**Fix:** Parse the chain ID directly from the `network` field at runtime.
+
+```javascript
+// ✓ Correct — parsed from payment_requirements
+const chainId = parseInt(requirement.network.split(":")[1])
+// "eip155:84532"  → 84532
+// "eip155:5042002" → 5042002 (Arc Testnet)
+```
+
+---
+
+### Signing `value` as a Float
+
+**Symptom:** `AMOUNT_MISMATCH` or `VALIDATION_ERROR`.
+
+**Cause:** Passing `29.99` instead of `"29990000"` as the transfer value. EIP-3009 `value` is a `uint256` — it must be an integer in atomic USDC units.
+
+**Fix:** Convert to atomic units before signing.
+
+```javascript
+// ✗ Wrong — float value
+message: { value: 29.99, ... }
+
+// ✓ Correct — atomic integer from payment_requirements
+message: { value: BigInt(requirement.maxAmountRequired), ... }
+// or: BigInt(Math.round(amountUsdc * 1_000_000))
+```
+
+---
+
+### Not Polling After Hosted Checkout Redirect
+
+**Symptom:** Orders fulfilled for payments that never actually settled.
+
+**Cause:** Relying solely on the `redirect_url` query parameter as proof of payment. Redirects can be interrupted by browser closes or network errors.
+
+**Fix:** Always confirm `status: "paid"` via `GET /api/v1/x402/intents/{id}` before fulfilling an order.
+
+---
+
+### Mixing Test and Production Keys
+
+**Symptom:** `INVALID_API_KEY` even though the key looks correct.
+
+**Cause:** `sk_test_` keys only authenticate against `testnetv1.ababilpay.xyz`. `sk_live_` keys only authenticate against `ababilpay.com`.
+
+**Fix:** Use the correct key for the environment you are targeting.
+
+| Key prefix | Correct base URL |
+|---|---|
+| `sk_test_...` | `https://testnetv1.ababilpay.xyz` |
+| `sk_live_...` | `https://ababilpay.com` |
+
+---
+
+## Retrying Failed Requests
+
+- **`INVALID_SIGNATURE`** — do not retry with the same signature. Generate a fresh nonce and re-sign.
+- **`INTENT_EXPIRED`** — create a new intent; expired intents cannot be reactivated.
+- **`ALREADY_PAID`** — do not retry. Check intent status and fulfil the order.
+- **`SETTLEMENT_FAILED`** — check buyer USDC balance and relay wallet gas. Retry with a new intent after resolving the underlying issue.
+- **`RATE_LIMITED`** — wait until the `X-RateLimit-Reset` timestamp before retrying.
+- **5xx errors** — safe to retry with exponential backoff. Check intent status first to avoid double-charging.
