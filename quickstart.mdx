@@ -1,104 +1,202 @@
 ---
 title: "Quickstart"
-description: "Accept a crypto payment that settles to USDC."
+description: "Accept your first USDC payment on testnet in under 10 minutes."
 ---
 
-This guide shows the minimum integration path for a merchant or developer: create a payment intent, send the customer to a payment link, and receive a signed webhook when payment completes.
+<Note>
+  Make sure you have an account on the [Ababilpay Dashboard](https://testnetv1.ababilpay.xyz) and a testnet API key before starting.
+</Note>
 
-<Info>
-  The production implementation is expected to use API keys, HMAC-signed webhooks, Circle testnet or mainnet configuration, and Supabase-backed merchant records.
-</Info>
+## Before You Begin
 
-## Integration flow
+1. Sign in to the [Ababilpay Dashboard](https://testnetv1.ababilpay.xyz)
+2. Go to **API Keys** and create a new `sk_test_...` key
+3. Go to **Wallets** and add at least one testnet wallet on any supported chain (Base Sepolia, Ethereum Sepolia, Arc Testnet, or Solana Devnet)
+
+---
+
+## Option A — Hosted Checkout (Recommended)
+
+The fastest path. You create an intent on your backend, redirect the buyer to Ababil's hosted checkout page, and poll for confirmation. No frontend work required.
 
 <Steps>
-  <Step title="Create a merchant account">
-    Sign in with Google OAuth. AbabilPay creates the Supabase user record, provisions a Circle developer-controlled wallet, and stores the merchant profile.
-  </Step>
   <Step title="Create a payment intent">
-    Call `POST /v1/payments/intent` with the USDC amount, customer reference, and optional metadata.
+    Call `POST /api/v1/x402/intents` from your backend with the amount and redirect URLs.
 
-    ```bash
-    curl -X POST https://api.ababilpay.io/v1/payments/intent \
-      -H "Authorization: Bearer $ABABILPAY_API_KEY" \
+    ```bash cURL
+    curl -X POST https://testnetv1.ababilpay.xyz/api/v1/x402/intents \
+      -H "Authorization: Bearer sk_test_..." \
       -H "Content-Type: application/json" \
       -d '{
-        "amount_usdc": 250,
-        "customer_email": "buyer@example.com",
-        "description": "Order #10042",
-        "success_url": "https://merchant.example/success",
-        "cancel_url": "https://merchant.example/cancel"
+        "amount_usdc":  10.00,
+        "description":  "Test Order",
+        "order_id":     "order_001",
+        "redirect_url": "https://yoursite.com/success",
+        "cancel_url":   "https://yoursite.com/cancel"
       }'
     ```
+
+    Response:
+
+    ```json
+    {
+      "success": true,
+      "data": {
+        "intent_id":    "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+        "status":       "pending",
+        "amount_usdc":  10.00,
+        "checkout_url": "https://testnetv1.ababilpay.xyz/pay/d03e0751-5a79-4b33-aa0e-d33dee344f27",
+        "expires_at":   "2026-05-26T13:00:00Z"
+      }
+    }
+    ```
   </Step>
-  <Step title="Redirect the customer">
-    Send the customer to the returned `payment_url`. The customer can pay with supported tokens, while AbabilPay handles auto-conversion to USDC.
+
+  <Step title="Redirect the buyer">
+    Send the buyer to `checkout_url`. Ababil handles wallet connect, chain selection, signing, and on-chain settlement.
+
+    ```javascript
+    // Express.js example
+    res.redirect(data.checkout_url)
+    ```
   </Step>
-  <Step title="Listen for the webhook">
-    Register a webhook endpoint with `POST /v1/webhooks` and subscribe to events such as `payment.completed`, `payment.failed`, and `refund.issued`.
+
+  <Step title="Confirm payment">
+    After the buyer lands on your `redirect_url`, poll the intent to verify settlement before fulfilling the order.
+
+    ```javascript
+    const res = await fetch(
+      `https://testnetv1.ababilpay.xyz/api/v1/x402/intents/${intentId}`,
+      { headers: { "Authorization": "Bearer sk_test_..." } }
+    )
+    const { data } = await res.json()
+
+    if (data.status === "paid") {
+      console.log("Settled on-chain:", data.tx_hash)
+      // fulfil order
+    }
+    ```
+
+    A confirmed payment response looks like this:
+
+    ```json
+    {
+      "success": true,
+      "data": {
+        "intent_id":     "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+        "status":        "paid",
+        "amount_usdc":   10.00,
+        "tx_hash":       "0xf4753b209212ece119cb099f8f499efb6a4df031...",
+        "buyer_address": "0xBuyerAddress",
+        "chain":         "eip155:84532",
+        "paid_at":       "2026-05-26T12:05:00Z"
+      }
+    }
+    ```
   </Step>
 </Steps>
 
-## Example payment intent response
+---
 
-```json
-{
-  "id": "pay_01HX7M2S9R5",
-  "status": "requires_payment",
-  "amount_usdc": 250,
-  "payment_url": "https://pay.ababilpay.io/pay/pay_01HX7M2S9R5",
-  "expires_at": "2026-05-10T15:02:00Z"
-}
-```
+## Option B — Custom Integration (Full Control)
 
-## Webhook payload
+Build your own payment UI or pay programmatically from an AI agent. Your frontend (or agent) signs the EIP-3009 authorization and submits it to Ababil for settlement.
 
-```json
-{
-  "event": "payment.completed",
-  "id": "evt_01HX9K8VQ2",
-  "created_at": "2026-05-10T14:32:00Z",
-  "data": {
-    "payment_id": "pay_01HX7M2S9R5",
-    "amount_usdc": 250,
-    "chain": "polygon",
-    "merchant_id": "mer_01HX7J9Y",
-    "token_in": "MATIC",
-    "tx_hash": "0xabc..."
-  }
-}
-```
+<Steps>
+  <Step title="Create a payment intent">
+    Same endpoint as above — no `redirect_url` needed for custom flows.
 
-## Webhook verification
+    ```bash
+    curl -X POST https://testnetv1.ababilpay.xyz/api/v1/x402/intents \
+      -H "Authorization: Bearer sk_test_..." \
+      -H "Content-Type: application/json" \
+      -d '{ "amount_usdc": 10.00, "order_id": "order_001" }'
+    ```
 
-Each webhook request should include a timestamp and HMAC signature header. Recompute the signature over the raw body and reject requests with invalid signatures or stale timestamps.
+    The response includes `payment_requirements` — one entry per chain your merchant wallet supports.
+  </Step>
 
-```ts
-import crypto from "node:crypto";
+  <Step title="Sign EIP-3009 typed data">
+    Pick the `payment_requirement` matching the buyer's chain and sign a `TransferWithAuthorization` message.
 
-export function verifyWebhook(rawBody: string, signature: string, secret: string) {
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)
-    .digest("hex");
+    ```typescript
+    // wagmi (React)
+    const signature = await signTypedDataAsync({
+      domain: {
+        name:              req.usdcDomainName,   // always read from API
+        version:           "2",
+        chainId:           parseInt(req.network.split(":")[1]),
+        verifyingContract: req.asset,
+      },
+      types: {
+        TransferWithAuthorization: [
+          { name: "from",        type: "address" },
+          { name: "to",          type: "address" },
+          { name: "value",       type: "uint256" },
+          { name: "validAfter",  type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce",       type: "bytes32" },
+        ],
+      },
+      primaryType: "TransferWithAuthorization",
+      message: {
+        from:        address,
+        to:          req.payTo,
+        value:       BigInt(req.maxAmountRequired),
+        validAfter:  0n,
+        validBefore: BigInt(Math.floor(Date.now() / 1000) + 900),
+        nonce:       `0x${crypto.getRandomValues(new Uint8Array(32))
+                       .reduce((s, b) => s + b.toString(16).padStart(2,"0"), "")}`,
+      },
+    })
+    ```
+  </Step>
 
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-}
-```
+  <Step title="Submit settlement">
+    Send the signed payload to `/api/v1/x402/pay`. Ababil verifies the signature and submits the on-chain transfer.
 
-## Common next steps
+    ```bash
+    curl -X POST https://testnetv1.ababilpay.xyz/api/v1/x402/pay \
+      -H "Authorization: Bearer sk_test_..." \
+      -H "Content-Type: application/json" \
+      -d '{
+        "intent_id": "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+        "payment_signature": {
+          "scheme":      "exact",
+          "network":     "eip155:84532",
+          "x402Version": 1,
+          "payload": {
+            "from":        "0xBuyerAddress",
+            "to":          "0xMerchantAddress",
+            "value":       "10000000",
+            "validAfter":  "0",
+            "validBefore": "1748300000",
+            "nonce":       "0x7752857d...",
+            "signature":   "0xacb8e1f5..."
+          }
+        }
+      }'
+    ```
+
+    On success, USDC lands directly in your merchant dashboard wallet.
+  </Step>
+</Steps>
+
+---
+
+## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Invoices" icon="pen-to-square" href="/commerce#invoice-system">
-    Create invoices, send branded payment links, and track payment state.
+  <Card title="Hosted Gateway" icon="arrow-up-right-from-square" href="/api-reference/hosted-gateway">
+    Full walkthrough of Path A with Node.js and Python examples.
   </Card>
-  <Card title="Shopify and WooCommerce" icon="terminal" href="/commerce#e-commerce-payment-suite">
-    Use hosted commerce plugins instead of a direct API integration.
+  <Card title="Custom Integration" icon="code" href="/api-reference/custom-integration">
+    EIP-3009 signing details, wagmi and viem code, Solana flow.
   </Card>
-  <Card title="Transfers" icon="code" href="/api-reference/introduction">
-    Send USDC to a wallet address or email recipient.
+  <Card title="AI Agent Integration" icon="robot" href="/api-reference/ai-agents">
+    Enable autonomous USDC payments from AI agents using a private key.
   </Card>
-  <Card title="Webhooks" icon="recycle" href="/api-reference/introduction">
-    Register an endpoint for payment and operational events.
+  <Card title="Errors & Troubleshooting" icon="circle-exclamation" href="/api-reference/errors">
+    Common mistakes, error codes, and how to fix them.
   </Card>
 </CardGroup>

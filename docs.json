@@ -12,9 +12,9 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Product Demo",
-          "icon": "book-open-cover",
-          "href": "https://ababilpay-io.github.io/ababilpay-desgin/"
+          "anchor": "Ababilpay Dashboard",
+          "icon": "layout-dashboard",
+          "href": "https://testnetv1.ababilpay.xyz"
         },
         {
           "anchor": "GitHub",
@@ -123,8 +123,8 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Product Demo",
-      "href": "https://ababilpay-io.github.io/ababilpay-desgin/"
+      "label": "Ababilpay Dashboard",
+      "href": "https://testnetv1.ababilpay.xyz"
     }
   },
   "contextual": {

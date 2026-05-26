@@ -1,57 +1,141 @@
 ---
 title: "Architecture"
-description: "Implementation model for the AbabilPay product."
+description: "How Ababil is built — the x402 protocol, payment flow, and system components."
 ---
 
-AbabilPay is organized around a Supabase-backed application core, Circle-powered wallet and USDC operations, and an AI agent layer that reacts to product events.
+## Overview
 
-## Authentication and onboarding
+Ababil is a payment infrastructure layer built on the **x402 protocol**. It sits between merchants and buyers, providing the API, dashboard, and on-chain relay needed to accept USDC payments — without ever holding funds.
 
-Users sign in with Google OAuth through Supabase Auth. On first login, the platform creates the Supabase user record, provisions a Circle developer-controlled wallet, and asks the user to select a role.
+The system is designed around three principles:
 
-| Step | Action | Stored in |
-| --- | --- | --- |
-| 1 | Google sign-in | `users.google_id` |
-| 2 | Circle wallet creation | `wallets.circle_wallet_id` |
-| 3 | Consumer or merchant role setup | `users.role`, `merchants.*` |
-| 4 | Optional KYC for ramps | Supabase Storage, `users.kyc_status` |
-| 5 | Dashboard routing | Supabase Auth session |
+- **Non-custodial** — USDC moves peer-to-peer, directly from buyer wallet to merchant dashboard wallet. Ababil relays the transaction but never holds or routes funds through its own accounts.
+- **Chain-agnostic** — a single payment intent covers all chains the merchant has registered wallets on. The buyer picks the chain at payment time.
+- **Agent-ready** — EIP-3009 authorizations require nothing beyond a private key, making fully autonomous AI agent payments possible with no browser or approval flow.
 
-## Event-driven operations
+---
 
-Product events are written to Supabase and picked up by Edge Functions or backend workers. The frontend subscribes to user-scoped Supabase Realtime channels so wallet balances, invoice states, split payment status, and notifications update without polling.
+## The x402 Protocol Triangle
 
-```mermaid
-flowchart LR
-  App[Web or mobile app] --> API[Fastify REST API]
-  API --> DB[(Supabase Postgres)]
-  API --> Circle[Circle APIs]
-  DB --> Realtime[Supabase Realtime]
-  Realtime --> App
-  DB --> Edge[Edge Function]
-  Edge --> Agents[AI Agent Orchestrator]
-  Agents --> Circle
-  Agents --> Email[Resend and FCM]
+Every payment involves three roles:
+
+```
+┌─────────────┐        creates intent        ┌──────────────┐
+│   Merchant  │ ──────────────────────────── │   Ababil     │
+│  Dashboard  │                              │   (Relay)    │
+└─────────────┘                              └──────────────┘
+       ▲                                            │
+       │  USDC lands in                             │ verifies signature
+       │  merchant wallet                           │ submits on-chain tx
+       │                                            ▼
+                                           ┌──────────────┐
+                                           │    Buyer     │
+                                           │ (or AI Agent)│
+                                           └──────────────┘
+                                            signs EIP-3009
+                                            authorization
 ```
 
-## Wallet model
+| Role | Responsibility |
+|---|---|
+| **Merchant** | Creates payment intents via API. Registers wallets on supported chains from the dashboard. Receives USDC directly into their dashboard wallet on settlement. |
+| **Buyer** | Signs a `TransferWithAuthorization` EIP-3009 message (EVM) or SPL transaction (Solana). No token approvals required. |
+| **Ababil** | Validates the signature, checks buyer balance, and submits `transferWithAuthorization` on-chain via relay EOA. Marks the intent `paid` on confirmation. |
 
-Each user sees one logical USDC balance. Under the hood, Circle manages chain-specific wallets and AbabilPay aggregates the balances into a single wallet view.
+---
 
-Supported chains in the current product plan:
+## Payment Flow
 
-- Ethereum
-- Monad
-- Base
-- Arc
-- Solana
+```
+1. Merchant backend
+      POST /api/v1/x402/intents { amount_usdc, ... }
+      ← intent_id, checkout_url, payment_requirements
 
-## Operational controls
+2. Buyer (browser or AI agent)
+      Signs TransferWithAuthorization typed data
+      with their private key / browser wallet
 
-| Control | Behavior |
-| --- | --- |
-| Row Level Security | User data is scoped by Supabase Auth UID. |
-| Audit logs | AI and payment actions are written to `agent_logs` and transaction tables. |
-| Webhook signing | Merchant webhook events are signed before delivery. |
-| Slippage control | Auto-convert enforces a 0.5% maximum slippage target. |
-| Multi-sig approvals | Enterprise accounts can require 2-of-3 approvals before outgoing transfers or payroll execution. |
+3. Ababil
+      Receives signed payload via POST /api/v1/x402/pay
+      Verifies EIP-3009 signature (viem verifyTypedData)
+      Checks buyer USDC balance ≥ maxAmountRequired
+      Confirms intent is pending and not expired
+      Calls usdc.transferWithAuthorization(...) on-chain
+      USDC moves buyer → merchant wallet (peer-to-peer)
+      Marks intent paid in DB with tx_hash and paid_at
+
+4. Merchant backend
+      GET /api/v1/x402/intents/{id}
+      ← status: "paid", tx_hash, paid_at
+      Fulfils order
+```
+
+---
+
+## EIP-3009 — How the Authorization Works
+
+EIP-3009 (`transferWithAuthorization`) is a standard on Circle USDC contracts that allows a **signed message** to authorize a USDC transfer, without requiring a separate on-chain `approve` transaction first.
+
+The buyer signs an EIP-712 typed data message containing:
+
+| Field | Description |
+|---|---|
+| `from` | Buyer wallet address |
+| `to` | Merchant wallet address (`payTo` from `payment_requirements`) |
+| `value` | Transfer amount in atomic USDC units |
+| `validAfter` | Earliest timestamp the authorization is valid (typically `0`) |
+| `validBefore` | Expiry timestamp (typically `now + 900s`) |
+| `nonce` | Random `bytes32` — used once, permanently recorded by the USDC contract |
+
+Ababil's relay wallet submits this signed data to the USDC contract. The contract verifies the signature and executes the transfer atomically — no separate approval step, no intermediate account.
+
+---
+
+## Supported Chains (Testnet v1)
+
+| Network | Chain ID | Role |
+|---|---|---|
+| Base Sepolia | `84532` | EVM — EIP-3009 |
+| Ethereum Sepolia | `11155111` | EVM — EIP-3009 |
+| Arc Testnet | `5042002` | EVM — EIP-3009 |
+| Solana Devnet | N/A | SPL token transfer |
+
+All EVM chains use the same `TransferWithAuthorization` signing flow. Solana uses a two-step flow: Ababil builds the unsigned SPL transfer transaction, the buyer signs it with their Solana wallet, and the signed transaction is submitted via `/pay`.
+
+---
+
+## Merchant Dashboard Wallet
+
+Each merchant registers one or more wallets from the **Ababilpay Dashboard**. These are the destination addresses for all USDC settlements.
+
+- Wallets are registered per chain — a merchant can have a Base Sepolia wallet and a Solana Devnet wallet simultaneously.
+- When a payment intent is created, `payment_requirements` is automatically populated with an entry for every chain the merchant has a registered wallet on.
+- USDC is transferred directly to the registered wallet address on settlement — it never passes through Ababil.
+
+---
+
+## API Authentication Model
+
+All API calls are authenticated with a merchant-scoped Bearer key:
+
+```
+Authorization: Bearer sk_test_...
+```
+
+The API key identifies which merchant the intent belongs to and which wallets to include in `payment_requirements`. Keys are created and revoked from the Dashboard → **API Keys**.
+
+---
+
+## Integration Paths
+
+Ababil supports two integration patterns that share the same intent creation endpoint:
+
+| | Hosted Gateway | Custom Integration |
+|---|---|---|
+| **Use case** | Human buyers, e-commerce | AI agents, white-label UIs |
+| **Buyer UX** | Ababil-hosted checkout page | Your own frontend |
+| **Signing** | Handled by Ababil checkout | Handled by your code |
+| **Settlement call** | Automatic (inside checkout) | `POST /api/v1/x402/pay` |
+| **AI agent support** | ✗ | ✓ |
+
+See [Hosted Gateway](/api-reference/hosted-gateway) and [Custom Integration](/api-reference/custom-integration) for full implementation details.
