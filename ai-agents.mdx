@@ -1,53 +1,84 @@
 ---
-title: "AI Agent System"
-description: "Autonomous agents for payment operations, fraud review, reminders, forecasting, and bridge routing."
+title: "AI-powered Operations"
+description: "Automated agents that handle payment operations, fraud review, invoice follow-up, and merchant insights."
 ---
 
-AbabilPay includes an AI agent layer built around Claude, LangChain-style orchestration, Supabase data, Circle actions, and pgvector memory. Agents react to product events, write audit logs, and communicate through email or push notifications.
+AbabilPay includes a built-in AI agent layer that automates routine payment operations — so merchants spend less time on manual tasks and more time on their business.
 
-## Architecture
+Agents react to payment events in real time, take action on behalf of the merchant, and log every decision for full auditability.
 
-The Orchestrator Agent receives events from Supabase Edge Functions and routes work to specialized agents. Each agent can use scoped tools for Supabase reads and writes, Circle API actions, Resend email, and push notifications.
+## What agents do for you
 
-```mermaid
-flowchart LR
-  Event[Supabase DB event] --> Edge[Edge Function trigger]
-  Edge --> Orchestrator[Orchestrator Agent]
-  Orchestrator --> Agent[Specialized sub-agent]
-  Agent --> Action[Circle API, email, or push]
-  Action --> Logs[agent_logs written]
-```
+<CardGroup cols={2}>
+  <Card title="Auto-Convert" icon="recycle">
+    When a customer pays with a non-USDC token, the auto-convert agent fetches the best available rate, executes the swap, and credits your wallet in USDC — automatically.
+  </Card>
+  <Card title="Invoice Follow-up" icon="bell">
+    Before a due date, the agent sends personalized reminders to customers. After an invoice goes overdue, it escalates follow-up and updates invoice status without manual intervention.
+  </Card>
+  <Card title="Fraud Detection" icon="shield-halved">
+    Every transaction is reviewed in real time. The agent flags unusual amounts, new destination wallets, and behavioral patterns that deviate from your typical activity.
+  </Card>
+  <Card title="Merchant Insights" icon="chart-line">
+    Weekly revenue summaries, 30-day cash-flow forecasts, and customer trend detection delivered to your inbox or dashboard — no manual reporting needed.
+  </Card>
+  <Card title="Bridge Routing" icon="route">
+    When bridging USDC across chains, the agent selects the optimal route based on current gas prices, fees, and speed — saving cost without requiring manual chain selection.
+  </Card>
+</CardGroup>
 
-## Agent roster
+## Agent behavior
 
-| Agent | Responsibility | Example actions |
-| --- | --- | --- |
-| Orchestrator | Event routing and task coordination | Receives webhook events, chooses sub-agent, handles retries, logs decisions. |
-| Auto-Convert Agent | Swap executor for non-USDC deposits | Fetches quotes, enforces slippage, executes swap, notifies user. |
-| Invoice Follow-Up Agent | Invoice reminder and collection workflow | Sends due-date reminders, marks overdue invoices, drafts personalized follow-ups. |
-| Fraud Detection Agent | Real-time anomaly and risk detection | Flags unusual amounts, detects new destination wallets, can hold suspicious transfers. |
-| Insights and Forecast Agent | Merchant analytics and cash-flow forecasting | Weekly revenue emails, 30-day forecasts, customer trend detection. |
-| Bridge Route Agent | Cross-chain route selection | Fetches gas data, estimates route cost, selects cheapest route that satisfies timing. |
+### Auto-convert
 
-## Agent memory
+When a non-USDC deposit is detected:
 
-Agents store reusable context as vector embeddings in the `agent_memory` table. This enables semantic search over transaction patterns, merchant history, and prior decisions without sending long histories to the model every time.
+1. The agent fetches a conversion quote at the best available market rate.
+2. It checks that slippage stays within acceptable bounds (max 0.5%).
+3. If approved, the swap executes and USDC is credited to your wallet.
+4. If slippage exceeds the limit, the conversion is queued and retried.
 
-```sql
-insert into agent_memory (user_id, content, embedding)
-values (
-  'user-uuid',
-  'User typically sends $200-500 USDC to 3 recurring wallets on Fridays',
-  openai_embedding('user payment pattern...')
-);
+You can configure auto-convert to run automatically, require your approval before executing, or trigger only above a threshold amount.
 
-select content
-from agent_memory
-where user_id = 'user-uuid'
-order by embedding <-> query_embedding
-limit 5;
-```
+| Mode | Behavior |
+| --- | --- |
+| Always convert | Default. Every non-USDC deposit is swapped without user action. |
+| Manual confirm | You receive a notification and approve before execution. |
+| Threshold mode | Conversion runs only above a configured USD amount. |
+
+**Supported tokens:** ETH, MATIC, SOL, BNB, USDT, DAI, WBTC, AVAX, ARB, and liquid ERC-20 assets.
+
+### Invoice follow-up
+
+The invoice agent monitors due dates and automates the collection workflow:
+
+| State | Agent action |
+| --- | --- |
+| 3 days before due | Sends a polite payment reminder to the customer. |
+| 1 day before due | Sends a final reminder. |
+| Due date passed | Marks invoice overdue, sends escalation message. |
+| Paid | Closes the follow-up sequence and logs completion. |
+
+### Fraud detection
+
+Every outgoing transfer and payment is reviewed before and after settlement:
+
+- Flags transfers to wallet addresses your account has never used before.
+- Detects unusual amounts relative to your typical transaction patterns.
+- Can hold a suspicious transfer for your review before it executes.
+- All flagged events appear in your dashboard for one-click approval or rejection.
+
+### Bridge routing
+
+When you initiate a cross-chain USDC transfer, the agent:
+
+1. Fetches live gas prices and bridge fees across all available routes.
+2. Estimates total cost and time for each option.
+3. Selects the route that best balances speed and cost for your transfer size.
+4. Executes the transfer and tracks settlement status in real time.
 
 ## Auditability
 
-Every agent action should be written to `agent_logs` with the agent type, action, input context, result, optional risk score, and timestamp. This keeps automated payment operations inspectable for support, compliance review, and product debugging.
+Every agent action is recorded with a full audit trail — the agent type, what action was taken, the input context, the outcome, and an optional risk score. This keeps automated operations inspectable for compliance review, support, and your own records.
+
+You can view agent activity in the **Dashboard → Activity Log** at any time.

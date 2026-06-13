@@ -1,86 +1,72 @@
 ---
 title: "AbabilPay Overview"
-description: "USDC-native, multichain payment infrastructure for wallets, merchants, commerce, and AI-powered operations."
+description: "USDC-native payment infrastructure for merchants, developers, and enterprise teams."
 ---
 
 # AbabilPay
 
-AbabilPay is a USDC-native payment infrastructure platform for consumers, merchants, developers, and enterprise teams. It abstracts chain complexity, keeps balances denominated in USDC, and automates payment operations through an AI agent layer.
+AbabilPay is a USDC-native payment infrastructure platform for merchants, developers, and enterprise teams. It abstracts blockchain complexity, keeps balances denominated in USDC, and provides a complete toolset for accepting and managing crypto payments.
 
-<Note>
-  Product docs version: v1.0 draft, May 2026. Core infrastructure: Circle APIs, Supabase, and AI agents.
-</Note>
+## What AbabilPay does
 
-## Positioning
+AbabilPay is designed to be the payment layer for the crypto economy — multichain-ready, USDC-first, and practical for real businesses that need checkout, invoices, payouts, and reporting.
 
-AbabilPay is built to be Stripe for the crypto economy: multichain-ready, USDC-first, low-volatility for merchants, and practical for real businesses that need checkout, invoices, payouts, and reporting.
-
-Everything inside the product is denominated in USDC. Customers can deposit or pay with supported tokens, while AbabilPay handles conversion, bridge routing, wallet provisioning, and transaction records behind the scenes.
+Customers pay with any supported token or chain. AbabilPay handles settlement, conversion, and delivery — your wallet receives USDC.
 
 ## Who it serves
 
 | User type | Who they are | Primary goals | Key surfaces |
 | --- | --- | --- | --- |
-| Consumer | Individual users | Pay merchants, send or receive USDC, manage wallet activity | Wallet, bridge, split payments, on-ramp |
-| Merchant | Stores, freelancers, SaaS teams | Accept payments, issue invoices, track revenue | Dashboard, invoices, plugins, off-ramp |
+| Merchant | Stores, freelancers, SaaS teams | Accept payments, issue invoices, track revenue | Dashboard, invoices, off-ramp |
 | Developer | App, Shopify, and WooCommerce builders | Integrate crypto payments into products | REST API, SDKs, webhooks, sandbox |
 | Enterprise | Larger businesses and DAO treasuries | Bulk payments, payroll, approvals | Payroll, multi-sig, white-label API |
-| AI agent system | Autonomous platform actor | Automate operational work | Agent orchestrator, Supabase, Circle tools |
+| Consumer | Individual users | Pay merchants, send or receive USDC, manage activity | Wallet, bridge, split payments, on-ramp |
 
 ## Core capabilities
 
 <CardGroup cols={2}>
-  <Card title="Unified USDC Wallet" icon="code" href="/features">
-    One logical wallet balance across Ethereum, Polygon, Base, Arbitrum, Solana, and Avalanche.
+  <Card title="Hosted Payment Checkout" icon="arrow-up-right-from-square" href="/api-reference/hosted-gateway">
+    Redirect buyers to a managed checkout page. Ababil handles wallet connect, chain selection, and on-chain settlement — you write ~10 lines of backend code.
   </Card>
-  <Card title="Auto-Convert" icon="recycle" href="/features#auto-convert">
-    Non-USDC deposits can be swapped to USDC automatically through 1inch or 0x.
+  <Card title="Custom Integration" icon="code" href="/api-reference/custom-integration">
+    Build your own payment UI or pay programmatically from an AI agent. Sign EIP-3009 typed data and submit settlement directly via API.
   </Card>
-  <Card title="CCTP Bridge" icon="map" href="/features#cross-chain-bridge">
-    Native USDC cross-chain transfers powered by Circle Cross-Chain Transfer Protocol.
+  <Card title="Invoices & Payment Links" icon="pen-to-square" href="/commerce#invoice-system">
+    Full invoice lifecycle with payment links, PDF generation, email delivery, reminders, and status tracking.
   </Card>
-  <Card title="Invoices" icon="pen-to-square" href="/commerce#invoice-system">
-    Merchant invoicing with payment links, PDFs, email delivery, reminders, and status tracking.
+  <Card title="Multi-chain Support" icon="map" href="/api-reference/networks">
+    Accept USDC on Base, Ethereum, Arbitrum, Solana, Polygon, and Avalanche from a single payment intent.
   </Card>
-  <Card title="Commerce Plugins" icon="terminal" href="/commerce">
-    Shopify and WooCommerce checkout integrations for crypto payments settled in USDC.
+  <Card title="AI-powered Operations" icon="stars" href="/ai-agents">
+    Automated agents for token conversion, invoice follow-up, fraud detection, and merchant insights.
   </Card>
-  <Card title="AI Operations" icon="stars" href="/ai-agents">
-    Agents for auto-convert, invoice follow-up, fraud detection, insights, and bridge routing.
+  <Card title="Payroll & Bulk Payments" icon="users" href="/commerce#payroll-and-bulk-payments">
+    Pay contractors, DAO contributors, and remote teams in USDC via CSV upload or API batch.
   </Card>
 </CardGroup>
 
-## Platform stack
+## How it works
 
-| Layer | Technology | Role |
-| --- | --- | --- |
-| Web frontend | Next.js 14, TypeScript | Merchant dashboard, consumer wallet, developer portal |
-| Mobile | React Native with Expo | iOS and Android wallet experience |
-| Backend API | Fastify and Node.js | REST API, orchestration, integrations |
-| Data and auth | Supabase | PostgreSQL, Auth, Realtime, Storage, Edge Functions, RLS |
-| Wallets and USDC | Circle APIs | Developer-controlled wallets, USDC, CCTP, ramps |
-| Swaps | 1inch and 0x | Token-to-USDC conversion quotes and execution |
-| AI | Claude API, LangChain, pgvector | Agent reasoning, orchestration, and long-term memory |
-| Notifications | Resend, Firebase FCM | Transactional email and mobile push |
-| Commerce | Shopify App, WordPress plugin | E-commerce checkout integrations |
+AbabilPay is built on the **x402 protocol** — a non-custodial payment standard using EIP-3009 USDC authorizations.
 
-## Why Supabase
-
-Supabase is the primary application backend because it combines PostgreSQL for structured transaction data, Auth for Google OAuth, Realtime for live wallet and invoice updates, Storage for invoice PDFs and KYC documents, Edge Functions for event handling, and pgvector for AI agent memory. Row Level Security policies enforce user-scoped access across product data.
+1. Your backend creates a **payment intent** via API.
+2. The buyer signs a `TransferWithAuthorization` message with their wallet — or your code signs on behalf of an AI agent.
+3. AbabilPay verifies the signature and executes the on-chain transfer.
+4. USDC moves directly into your registered merchant wallet. AbabilPay never holds funds.
 
 ## Read next
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Integrate a hosted payment link, API key, and webhook endpoint.
+    Accept your first USDC payment in under 10 minutes.
   </Card>
-  <Card title="Core Features" icon="code" href="/features">
-    Wallet, auto-convert, bridge, ramp, and split payment behavior.
+  <Card title="API Overview" icon="terminal" href="/api">
+    Authentication, base URLs, and endpoint reference.
   </Card>
-  <Card title="API Reference" icon="terminal" href="/api-reference/introduction">
-    Review the REST API endpoints and webhook event payloads.
+  <Card title="Hosted Gateway" icon="arrow-up-right-from-square" href="/api-reference/hosted-gateway">
+    Full walkthrough for e-commerce and invoice payment flows.
   </Card>
-  <Card title="Roadmap" icon="map" href="/roadmap">
-    Product phases from MVP through advanced commerce features.
+  <Card title="Custom Integration" icon="code" href="/api-reference/custom-integration">
+    EIP-3009 signing for custom UIs and AI agent payments.
   </Card>
 </CardGroup>

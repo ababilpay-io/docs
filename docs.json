@@ -3,16 +3,20 @@
   "theme": "mint",
   "name": "AbabilPay Docs",
   "colors": {
-    "primary": "#0fa8ea",
-    "light": "#34c8fa",
-    "dark": "#0184db"
+    "primary": "#5ffbf1",
+    "light": "#7ffcf4",
+    "dark": "#00c4b8"
   },
-  "favicon": "/images/ababilpay-logo.webp",
+  "favicon": "/favicon.svg",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
   "navigation": {
     "global": {
       "anchors": [
         {
-          "anchor": "Ababilpay Dashboard",
+          "anchor": "Dashboard",
           "icon": "layout-dashboard",
           "href": "https://testnetv1.ababilpay.xyz"
         },
@@ -41,7 +45,6 @@
               "features",
               "commerce",
               "ai-agents",
-              "data-model",
               "roadmap"
             ]
           }
@@ -59,7 +62,7 @@
             ]
           },
           {
-            "group": "Integration Paths",
+            "group": "Integration paths",
             "pages": [
               "api-reference/hosted-gateway",
               "api-reference/custom-integration"
@@ -72,7 +75,7 @@
             ]
           },
           {
-            "group": "AI Agents",
+            "group": "AI agents",
             "pages": [
               "api-reference/ai-agents"
             ]
@@ -88,32 +91,14 @@
     ]
   },
   "redirects": [
-    {
-      "source": "/feature",
-      "destination": "/features"
-    },
-    {
-      "source": "/product/feature",
-      "destination": "/features"
-    },
-    {
-      "source": "/product/features",
-      "destination": "/features"
-    },
-    {
-      "source": "/product/commerce",
-      "destination": "/commerce"
-    },
-    {
-      "source": "/commarch",
-      "destination": "/commerce"
-    },
-    {
-      "source": "/commerch",
-      "destination": "/commerce"
-    }
+    { "source": "/feature",          "destination": "/features" },
+    { "source": "/product/feature",  "destination": "/features" },
+    { "source": "/product/features", "destination": "/features" },
+    { "source": "/product/commerce", "destination": "/commerce" },
+    { "source": "/commarch",         "destination": "/commerce" },
+    { "source": "/commerch",         "destination": "/commerce" },
+    { "source": "/data-model",       "destination": "/features" }
   ],
-  "logo": "/images/ababilpay-logo.webp",
   "navbar": {
     "links": [
       {
@@ -123,21 +108,21 @@
     ],
     "primary": {
       "type": "button",
-      "label": "Ababilpay Dashboard",
+      "label": "Dashboard",
       "href": "https://testnetv1.ababilpay.xyz"
     }
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {

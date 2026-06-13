@@ -1,35 +1,34 @@
 ---
 title: "Core Features"
-description: "Wallet, auto-convert, bridge, ramp, and split payment capabilities."
+description: "Wallet, auto-convert, bridge, on/off ramp, and split payment capabilities."
 ---
 
 ## Unified smart wallet
 
-Each user has one logical wallet showing a unified USDC balance across supported chains. Circle Programmable Wallets manages the chain-specific accounts, while Supabase Realtime pushes balance changes to the app.
+Each user has one logical wallet showing a unified USDC balance across all supported chains. Chain-specific accounts are managed behind the scenes — you see a single balance and interact with one wallet.
 
 | Feature | Description |
 | --- | --- |
 | Unified balance | Aggregated USDC total across Ethereum, Polygon, Base, Arbitrum, Solana, and Avalanche. |
-| Chain breakdown | Expandable per-chain balance view. |
-| Developer-controlled keys | Circle manages private keys, so users do not handle seed phrases. |
-| Realtime sync | Supabase Realtime updates balances after confirmed transactions. |
-| Transaction history | Ledger from `transactions`, filterable by chain, type, and date range. |
+| Chain breakdown | Expandable per-chain balance view when needed. |
+| Non-custodial keys | No seed phrases for users — keys are managed securely without self-custody risk. |
+| Live balance updates | Balances refresh automatically after confirmed transactions. |
+| Transaction history | Full ledger filterable by chain, type, and date range. |
 | QR receive | Generate receive QR codes for in-person or remote payments. |
-| Address book | Save frequent recipient wallets per user. |
-| Multi-sig support | Enterprise accounts can require approvals before outgoing transfers. |
+| Address book | Save and label frequent recipient wallets. |
+| Multi-sig support | Enterprise accounts can require approvals before outgoing transfers execute. |
 
 ## Auto-convert
 
-Auto-convert is the flagship settlement feature. When a non-USDC token is deposited or used for payment, AbabilPay can swap it to USDC through 1inch or 0x before crediting the wallet.
+Auto-convert is the flagship settlement feature. When a non-USDC token is deposited or used for payment, AbabilPay swaps it to USDC at the best available market rate before crediting the wallet.
 
-```mermaid
-flowchart LR
-  Deposit[Deposit detected] --> Edge[Supabase Edge Function]
-  Edge --> Quote[1inch or 0x quote]
-  Quote --> Swap[Swap executed]
-  Swap --> Credit[USDC credited]
-  Credit --> Log[Supabase logged]
-  Log --> UI[Realtime UI push]
+```
+Deposit detected
+  → Best available conversion quote fetched
+  → Slippage check (max 0.5%)
+  → Swap executed
+  → USDC credited to wallet
+  → Live balance update pushed
 ```
 
 | Mode | Behavior |
@@ -42,20 +41,20 @@ flowchart LR
 
 ## Cross-chain bridge
 
-AbabilPay uses Circle Cross-Chain Transfer Protocol (CCTP) for native USDC movement across chains. USDC is burned on the source chain and minted on the destination chain, avoiding wrapped assets.
+AbabilPay uses Circle Cross-Chain Transfer Protocol (CCTP) for native USDC movement across chains. USDC is burned on the source chain and minted on the destination chain — no wrapped assets, no intermediary tokens.
 
 | Feature | Detail |
 | --- | --- |
-| CCTP native transfer | Native burn-and-mint USDC movement. |
-| Supported routes | Ethereum, Polygon, Base, Arbitrum, Avalanche, and Solana routes. |
-| AI route selection | Agent chooses a route based on gas, cost, and speed. |
+| Native transfer | Burn-and-mint USDC movement — no wrapped tokens. |
+| Supported routes | Ethereum, Polygon, Base, Arbitrum, Avalanche, and Solana. |
+| AI route selection | Agent chooses the optimal route based on gas cost and speed. |
 | Gas abstraction | Fees can be deducted from the USDC amount shown before confirmation. |
-| Status tracking | Live bridge progress appears through Supabase Realtime updates. |
-| Time estimate | Target experience is usually seconds to minutes depending on route and network state. |
+| Status tracking | Live bridge progress updates throughout the transfer. |
+| Time estimate | Typically seconds to minutes depending on route and network conditions. |
 
 ## On-ramp and off-ramp
 
-Circle Payments API powers fiat-to-USDC and USDC-to-fiat flows. KYC is verified once and KYC documents are stored in Supabase Storage.
+Fiat-to-USDC (on-ramp) and USDC-to-fiat (off-ramp) are supported for verified accounts. KYC is completed once and applies across all ramp operations.
 
 | Direction | Supported methods | Planned regions |
 | --- | --- | --- |
@@ -67,13 +66,13 @@ Circle Payments API powers fiat-to-USDC and USDC-to-fiat flows. KYC is verified 
 
 ## Split payments
 
-Split payments let a group share a bill through one payment session. The organizer creates a split, shares a link or QR code, and each participant pays their assigned share with any supported token.
+Split payments let a group share a bill through one payment session. The organizer creates a split, shares a link or QR code, and each participant pays their assigned share independently with any supported token.
 
 | Feature | Description |
 | --- | --- |
-| Create split | Set total, participant count, and note in `splits`. |
+| Create split | Set total, participant count, and a note. |
 | Share link or QR | Participants pay independently through a hosted flow. |
-| Equal or custom amounts | Divide equally or assign individual amounts. |
-| Live tracking | Supabase Realtime shows who has paid. |
+| Equal or custom amounts | Divide equally or assign individual amounts per participant. |
+| Live tracking | See who has paid in real time. |
 | Expiry | Sessions expire after 7 days by default. |
-| Auto payout | Once fully funded, USDC transfers to the organizer wallet. |
+| Auto payout | Once fully funded, USDC transfers automatically to the organizer wallet. |

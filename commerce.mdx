@@ -5,59 +5,59 @@ description: "Invoices, e-commerce checkout, payroll, and bulk payment workflows
 
 ## Invoice system
 
-The invoice system gives merchants a full payment collection workflow. Invoices are stored in Supabase, PDFs are generated server-side and saved to Supabase Storage, and customers pay through a hosted payment link.
+The invoice system gives merchants a complete payment collection workflow. Create invoices with line items, send them by email, and track status from draft to paid — all from the dashboard or API.
 
 | Feature | Description |
 | --- | --- |
-| Invoice creation | Line items, due date, notes, and tax fields in `invoices` and `invoice_items`. |
-| Payment link | Unique URL where customers can pay with supported tokens. |
-| PDF generation | Merchant-branded PDF saved to Supabase Storage. |
-| Email delivery | Sent through Resend with merchant branding. |
-| Status lifecycle | Draft, sent, viewed, paid, overdue, or cancelled. |
+| Invoice creation | Line items, due date, notes, and tax fields. |
+| Payment link | Unique URL where customers pay with any supported token. |
+| PDF generation | Merchant-branded PDF available for download and email delivery. |
+| Email delivery | Sent directly to customers with your merchant branding. |
+| Status lifecycle | Draft → Sent → Viewed → Paid → Overdue → Cancelled. |
 | Recurring invoices | Weekly, monthly, or yearly schedule support. |
-| Partial payments | Invoice remains open until the full amount is settled. |
+| Partial payments | Invoice stays open until the full amount is settled. |
 | Multi-currency display | Display USD, EUR, GBP, BDT, and other currencies while settling in USDC. |
-| AI follow-up | Agent sends reminders before due date and after overdue state. |
+| AI follow-up | Agent sends reminders before the due date and escalates after overdue state. |
 
 ## E-commerce payment suite
 
 ### Shopify plugin
 
-The Shopify integration lets merchants install an AbabilPay app, connect through OAuth, and show a crypto payment option alongside existing checkout methods.
+The Shopify integration lets merchants install an AbabilPay app, connect through OAuth, and present a crypto payment option alongside existing checkout methods.
 
 | Feature | Detail |
 | --- | --- |
 | Install | One-click app install with OAuth connection to AbabilPay. |
-| Checkout widget | Customer-facing USDC and crypto payment option. |
-| Auto-convert | Customer can pay with supported tokens, merchant receives USDC. |
-| Order sync | Confirmed payment marks Shopify order as paid through Shopify Admin API. |
-| Refunds | Merchant initiates refund from AbabilPay dashboard. |
+| Checkout widget | Customer-facing USDC and crypto payment option on your Shopify checkout. |
+| Auto-convert | Customers can pay with any supported token — merchant receives USDC. |
+| Order sync | Confirmed payment marks the Shopify order as paid automatically. |
+| Refunds | Merchant initiates refunds from the AbabilPay dashboard. |
 
 ### WooCommerce plugin
 
-The WooCommerce plugin is installed as a WordPress plugin package. It mirrors the Shopify payment flow and uses WooCommerce webhooks plus the PHP SDK to synchronize orders and refunds.
+The WooCommerce plugin is installed as a standard WordPress plugin. It mirrors the Shopify payment flow and automatically synchronizes orders and refunds with your WooCommerce store.
 
-## API and SDKs
+## SDKs and APIs
 
-| SDK or API | Details |
+| SDK or integration | Details |
 | --- | --- |
-| REST API | API-key authentication, rate limits, payment, invoice, transfer, bridge, and webhook endpoints. |
-| JavaScript SDK | Node.js and browser support with TypeScript types. |
-| Python SDK | Async Python client using `httpx`, intended for backend integrations. |
-| PHP SDK | Composer package for Laravel and vanilla PHP. |
-| Webhooks | HMAC-signed events such as `payment.completed`, `invoice.paid`, and `refund.issued`. |
-| Sandbox | Circle testnet and Supabase test project environment. |
+| REST API | API-key authentication with payment, invoice, transfer, bridge, and webhook endpoints. |
+| JavaScript SDK | Node.js and browser support with full TypeScript types. |
+| Python SDK | Async client intended for backend and server integrations. |
+| PHP SDK | Composer package for Laravel and standard PHP applications. |
+| Webhooks | HMAC-signed events: `payment.completed`, `invoice.paid`, `refund.issued`, and more. |
+| Sandbox | Testnet environment with test API keys for safe integration development. |
 
 ## Payroll and bulk payments
 
-Payroll supports businesses paying remote teams, DAO contributors, contractors, and affiliates. Employers upload a CSV or build a recipient list in the dashboard, then execute the batch through Circle transfer infrastructure.
+Payroll lets businesses pay remote teams, DAO contributors, contractors, and affiliates in USDC. Upload a recipient list or build one in the dashboard, then execute the batch in one action.
 
 | Feature | Description |
 | --- | --- |
-| CSV upload | Recipient wallet or email, amount in USDC, and note. |
-| One-click execute | Transfers are logged individually in `payroll_items`. |
-| Multi-sig approval | Enterprise batches can require 2-of-3 approvals. |
-| Status dashboard | Per-recipient pending, sent, or failed states with retry. |
-| Tax export | CSV or PDF summary per batch saved to Supabase Storage. |
+| CSV upload | Recipient wallet or email, amount in USDC, and an optional note per row. |
+| One-click execute | All transfers are processed and individually tracked. |
+| Multi-sig approval | Enterprise batches can require multiple approvals before execution. |
+| Status dashboard | Per-recipient pending, sent, or failed states with retry on failure. |
+| Tax export | CSV or PDF summary per batch available for download. |
 | Scheduled payroll | Weekly, bi-weekly, or monthly scheduled execution. |
-| AI anomaly check | Agent flags unusual amounts or new recipient wallets before execution. |
+| AI anomaly check | Agent flags unusual amounts or new recipient wallets before the batch runs. |
