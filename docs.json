@@ -83,6 +83,7 @@
           {
             "group": "Reference",
             "pages": [
+              "api-reference/webhooks",
               "api-reference/errors"
             ]
           }

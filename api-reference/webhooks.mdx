@@ -1,0 +1,222 @@
+---
+title: "Webhooks"
+description: "Receive real-time event notifications when payments, invoices, and transfers change state."
+---
+
+Webhooks let AbabilPay push event notifications to your server as things happen — no polling required. When a payment is confirmed, an invoice goes overdue, or a bridge transfer completes, AbabilPay sends an HTTP `POST` to your registered endpoint with a signed JSON payload.
+
+## Registering a webhook endpoint
+
+Register an endpoint from **Dashboard → Settings → Webhooks**, or via API:
+
+```bash
+POST https://testnetv1.ababilpay.xyz/api/v1/webhooks
+Authorization: Bearer sk_test_...
+Content-Type: application/json
+
+{
+  "url":    "https://yourserver.com/webhooks/ababilpay",
+  "events": ["payment.completed", "invoice.paid", "refund.issued"]
+}
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "webhook_id": "wh_a1b2c3d4",
+    "url":        "https://yourserver.com/webhooks/ababilpay",
+    "events":     ["payment.completed", "invoice.paid", "refund.issued"],
+    "secret":     "whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "created_at": "2026-05-25T10:00:00Z"
+  }
+}
+```
+
+<Warning>
+  Store the `secret` immediately — it is shown only once. You will use it to verify every incoming webhook signature.
+</Warning>
+
+---
+
+## Payload format
+
+Every webhook request is a `POST` with `Content-Type: application/json`. The body follows a consistent envelope:
+
+```json
+{
+  "id":         "evt_9f3e2a1b",
+  "event":      "payment.completed",
+  "created_at": "2026-05-25T12:05:00Z",
+  "data": {
+    "intent_id":     "d03e0751-5a79-4b33-aa0e-d33dee344f27",
+    "status":        "paid",
+    "amount_usdc":   29.99,
+    "order_id":      "order_8821",
+    "tx_hash":       "0xf4753b209212ece119cb099f8f499efb6a4df031...",
+    "buyer_address": "0xBuyerAddress",
+    "chain":         "eip155:84532",
+    "paid_at":       "2026-05-25T12:05:00Z"
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Unique event ID. Use this to deduplicate retries. |
+| `event` | string | Event type. See [Event types](#event-types) below. |
+| `created_at` | string | ISO 8601 timestamp of when the event was generated. |
+| `data` | object | Event-specific payload. Shape varies by event type. |
+
+---
+
+## Verifying signatures
+
+Every request includes an `AbabilPay-Signature` header. **Always verify this before processing the payload** — it proves the request came from AbabilPay and the body was not tampered with.
+
+The signature is an HMAC-SHA256 of the raw request body, signed with your webhook secret.
+
+<CodeGroup>
+
+```javascript Node.js
+import crypto from "crypto"
+
+function verifyWebhook(rawBody, signatureHeader, secret) {
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)          // rawBody must be the raw Buffer, not parsed JSON
+    .digest("hex")
+
+  const trusted = Buffer.from(`sha256=${expected}`, "utf8")
+  const received = Buffer.from(signatureHeader, "utf8")
+
+  // Constant-time comparison prevents timing attacks
+  if (trusted.length !== received.length) return false
+  return crypto.timingSafeEqual(trusted, received)
+}
+
+// Express.js example
+app.post("/webhooks/ababilpay", express.raw({ type: "application/json" }), (req, res) => {
+  const sig = req.headers["ababilpay-signature"]
+
+  if (!verifyWebhook(req.body, sig, process.env.ABABILPAY_WEBHOOK_SECRET)) {
+    return res.status(401).send("Invalid signature")
+  }
+
+  const event = JSON.parse(req.body)
+
+  switch (event.event) {
+    case "payment.completed":
+      // fulfil order using event.data.order_id
+      break
+    case "invoice.paid":
+      // mark invoice settled
+      break
+  }
+
+  res.status(200).send("ok")
+})
+```
+
+```python Python
+import hmac
+import hashlib
+import os
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+
+def verify_webhook(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    expected = "sha256=" + hmac.new(
+        secret.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature_header)
+
+@app.route("/webhooks/ababilpay", methods=["POST"])
+def webhook():
+    sig = request.headers.get("AbabilPay-Signature", "")
+    raw = request.get_data()
+
+    if not verify_webhook(raw, sig, os.environ["ABABILPAY_WEBHOOK_SECRET"]):
+        abort(401)
+
+    event = request.get_json(force=True)
+
+    if event["event"] == "payment.completed":
+        pass  # fulfil order using event["data"]["order_id"]
+    elif event["event"] == "invoice.paid":
+        pass  # mark invoice settled
+
+    return "ok", 200
+```
+
+</CodeGroup>
+
+<Warning>
+  Use the **raw request body** for signature verification — not a re-serialised version of the parsed JSON. Any whitespace difference will cause verification to fail.
+</Warning>
+
+---
+
+## Event types
+
+| Event | Trigger | Key fields in `data` |
+|---|---|---|
+| `payment.completed` | Payment intent fully settled on-chain. | `intent_id`, `tx_hash`, `amount_usdc`, `order_id`, `chain`, `paid_at` |
+| `payment.failed` | Payment attempt failed before settlement. | `intent_id`, `reason`, `order_id` |
+| `payment.expired` | Intent was not paid within the 30-minute window. | `intent_id`, `order_id`, `expired_at` |
+| `invoice.paid` | Invoice fully settled. | `invoice_id`, `amount_usdc`, `paid_at` |
+| `invoice.overdue` | Invoice is past its due date with an unpaid balance. | `invoice_id`, `amount_usdc`, `due_date` |
+| `refund.issued` | Refund processed and USDC returned to the buyer. | `refund_id`, `amount_usdc`, `tx_hash` |
+| `bridge.completed` | CCTP bridge transfer settled on the destination chain. | `bridge_id`, `from_chain`, `to_chain`, `amount_usdc`, `tx_hash` |
+| `transfer.completed` | USDC transfer to an external wallet confirmed. | `transfer_id`, `to_address`, `amount_usdc`, `tx_hash` |
+| `payroll.batch_completed` | All recipients in a payroll batch have been paid. | `batch_id`, `total_usdc`, `recipient_count` |
+| `fraud.flagged` | AI agent flagged a transaction for review. | `transaction_id`, `risk_score`, `reason` |
+
+---
+
+## Retry behavior
+
+If your endpoint does not return a `2xx` response within **10 seconds**, AbabilPay retries with exponential backoff:
+
+| Attempt | Delay after previous |
+|---|---|
+| 1 | Immediate |
+| 2 | 1 minute |
+| 3 | 5 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+
+After 5 failed attempts the event is marked as failed and no further retries occur. You can manually replay failed events from **Dashboard → Settings → Webhooks**.
+
+**Deduplication:** Use the `id` field to detect retries. Store processed event IDs and skip any event whose ID you have already handled.
+
+---
+
+## Testing webhooks
+
+Use the sandbox environment to send test events without real on-chain transactions:
+
+```bash
+POST https://testnetv1.ababilpay.xyz/api/v1/webhooks/test
+Authorization: Bearer sk_test_...
+Content-Type: application/json
+
+{
+  "webhook_id": "wh_a1b2c3d4",
+  "event":      "payment.completed"
+}
+```
+
+AbabilPay will deliver a simulated `payment.completed` payload to your registered endpoint so you can test your handler end-to-end.
+
+For local development, use a tunneling tool such as [ngrok](https://ngrok.com) to expose your local server:
+
+```bash
+ngrok http 3000
+# Copy the https:// URL → register it as your webhook endpoint in the dashboard
+```
